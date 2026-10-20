@@ -276,7 +276,7 @@ function OfferCard({
       <div className="track" aria-hidden="true">
         <div className="bar" style={{ width: `${fraction * 100}%` }} />
       </div>
-      <p className="muted">{formatKm(offer.distanceM)} to pickup</p>
+      <p className="muted">{formatKm(offer.pickupDistanceM)} to pickup</p>
       <div className="stops">
         <div className="stop">
           <span className="stop-mark dot" />

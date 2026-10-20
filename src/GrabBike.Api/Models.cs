@@ -155,7 +155,8 @@ public sealed record OfferDto(
     int DistanceM,
     int DurationS,
     DateTimeOffset ExpiresAt,
-    int Round);
+    int Round,
+    int PickupDistanceM);
 
 public sealed record DriverLocationDto(
     Guid RideId,

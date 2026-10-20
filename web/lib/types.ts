@@ -67,6 +67,7 @@ export type Offer = {
   durationS: number;
   expiresAt: string;
   round: number;
+  pickupDistanceM: number;
 };
 
 export type DriverLocation = {

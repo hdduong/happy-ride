@@ -175,6 +175,7 @@ export function asOffer(value: unknown): Offer | null {
     durationS: num(row, "durationS", "DurationS") ?? 0,
     expiresAt: str(row, "expiresAt", "ExpiresAt") ?? "",
     round: num(row, "round", "Round") ?? 1,
+    pickupDistanceM: num(row, "pickupDistanceM", "PickupDistanceM") ?? 0,
   };
 }
 

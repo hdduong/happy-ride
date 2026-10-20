@@ -94,6 +94,7 @@ export function RiderHome({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (!allowSearch) return;
+    const seq = ++searchSeq.current;
     const text = query.trim();
     if (!text) {
       setResults([]);
@@ -102,7 +103,6 @@ export function RiderHome({ userId }: { userId: string }) {
     }
     setSearching(true);
     const handle = window.setTimeout(() => {
-      const seq = ++searchSeq.current;
       void autocomplete(userId, text, home.lat, home.lng)
         .then((places) => {
           if (searchSeq.current === seq) setResults(places);

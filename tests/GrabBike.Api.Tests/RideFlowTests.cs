@@ -74,6 +74,8 @@ public class RideFlowTests
         var offer = offers.EnumerateArray().Single(item => item.GetProperty("rideId").GetGuid() == rideId);
         Assert.Equal(1, offer.GetProperty("round").GetInt32());
         Assert.True(offer.GetProperty("distanceM").GetInt32() > 0);
+        Assert.True(offer.GetProperty("pickupDistanceM").GetInt32() > 0);
+        Assert.True(offer.GetProperty("pickupDistanceM").GetInt32() < offer.GetProperty("distanceM").GetInt32());
         Assert.True(offer.GetProperty("durationS").GetInt32() > 0);
         Assert.Equal("Chợ Bến Thành, District 1", offer.GetProperty("pickup").GetProperty("address").GetString());
         var ttl = offer.GetProperty("expiresAt").GetDateTimeOffset() - DateTimeOffset.UtcNow;
