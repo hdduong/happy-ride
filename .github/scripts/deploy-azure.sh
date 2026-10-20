@@ -12,9 +12,10 @@ LOCATION="${AZURE_LOCATION:-southeastasia}"
 pick_runtime() {
   local pattern="$1"
   local runtimes line
+  # Current az returns "NAME|VERSION<tab>end-of-support<tab>...". --runtime accepts only the first field.
   runtimes="$(az webapp list-runtimes --os linux -o tsv | tr -d '\r')"
   line="$(printf '%s\n' "$runtimes" | grep -E -i "$pattern" | head -n 1 || true)"
-  printf '%s' "$line" | tr ':' '|'
+  printf '%s' "$line" | awk -F '\t' '{ print $1 }' | tr ':' '|'
 }
 
 api_runtime="$(pick_runtime '^DOTNETCORE[:|]10' || true)"
