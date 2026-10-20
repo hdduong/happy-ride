@@ -35,6 +35,8 @@ export function RiderHome({ userId }: { userId: string }) {
   const [quoting, setQuoting] = useState(false);
   const [homeReady, setHomeReady] = useState(false);
   const [home, setHome] = useState(() => pickupForCity(undefined));
+  const [cityError, setCityError] = useState<string | null>(null);
+  const [cityAttempt, setCityAttempt] = useState(0);
   const searchSeq = useRef(0);
   const epoch = useRef(0);
   const ignored = useRef(new Set<string>());
@@ -54,13 +56,16 @@ export function RiderHome({ userId }: { userId: string }) {
         if (!person) return;
         rememberPersona(person.id, person.city);
         setHome(pickupForCity(person.city));
+        setCityError(null);
         setHomeReady(true);
       })
-      .catch(() => undefined);
+      .catch((reason: unknown) => {
+        if (!cancel && !homeReady) setCityError(messageFrom(reason));
+      });
     return () => {
       cancel = true;
     };
-  }, [userId]);
+  }, [homeReady, userId, cityAttempt]);
 
   useEffect(() => {
     return openRideConnection(userId, {
@@ -272,7 +277,20 @@ export function RiderHome({ userId }: { userId: string }) {
     markers.push({ ...driverPoint, kind: "bike", heading });
   }
 
-  let sheet = (
+  let sheet = !homeReady && cityError ? (
+    <div className="stack">
+      <h1>Can't load your city</h1>
+      <ErrorLine message={cityError} />
+      <PrimaryButton
+        onClick={() => {
+          setCityError(null);
+          setCityAttempt((attempt) => attempt + 1);
+        }}
+      >
+        Retry
+      </PrimaryButton>
+    </div>
+  ) : (
     <SearchSheet
       pickupName={home.name}
       ready={homeReady}
