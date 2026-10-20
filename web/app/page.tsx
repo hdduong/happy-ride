@@ -1,6 +1,6 @@
 "use client";
 
-import { UserPicker } from "@/components/UserPicker";
+import { UserPicker } from "@/features/identity/UserPicker";
 
 export default function HomePage() {
   return <UserPicker />;
