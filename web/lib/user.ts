@@ -10,11 +10,13 @@ export function homeForRole(role: string): "/rider" | "/driver" {
 }
 
 export function rememberUser(userId: string): void {
+  const previous = sessionStorage.getItem(USER_STORAGE_KEY);
   sessionStorage.setItem(USER_STORAGE_KEY, userId);
+  if (previous && previous !== userId) sessionStorage.removeItem(CITY_STORAGE_KEY);
 }
 
 export function rememberPersona(userId: string, city: string): void {
-  rememberUser(userId);
+  sessionStorage.setItem(USER_STORAGE_KEY, userId);
   sessionStorage.setItem(CITY_STORAGE_KEY, city);
 }
 

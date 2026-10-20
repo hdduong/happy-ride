@@ -50,13 +50,17 @@ export function DriverHome({ userId }: { userId: string }) {
   useEffect(() => {
     return openRideConnection(userId, {
       onRide: (incoming) => {
-        if (rideClosed.current.has(incoming.rideId) && isActiveStatus(incoming.status)) return;
-        if (incoming.status === "Cancelled") setNotice("Ride cancelled");
-        if (!isActiveStatus(incoming.status)) {
-          rideClosed.current.set(incoming.rideId, Date.now());
-          setLive(null);
-        }
-        setRide((previous) => applyDriverRide(previous, incoming));
+        setRide((previous) => {
+          if (!isActiveStatus(incoming.status)) {
+            rideClosed.current.set(incoming.rideId, Date.now());
+            if (previous && previous.rideId !== incoming.rideId) return previous;
+            if (incoming.status === "Cancelled") setNotice("Ride cancelled");
+            setLive(null);
+            return null;
+          }
+          if (rideClosed.current.has(incoming.rideId)) return previous;
+          return applyDriverRide(previous, incoming);
+        });
       },
       onLocation: (location) => setLive(location),
       onOffer: (offer) => {
