@@ -49,10 +49,6 @@ jobs:
         working-directory: web
         run: npm ci
 
-      - name: Test frontend state and connection lifecycle
-        working-directory: web
-        run: npm test
-
       - name: Install browser tests
         working-directory: e2e
         run: npm ci

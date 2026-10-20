@@ -1,14 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GrabBike.Api.Features.Dev;
-using GrabBike.Api.Features.Dispatch;
-using GrabBike.Api.Features.Drivers;
-using GrabBike.Api.Features.Maps;
-using GrabBike.Api.Features.Realtime;
-using GrabBike.Api.Features.Rides;
-using GrabBike.Api.Infrastructure.Persistence;
-using GrabBike.Api.Infrastructure.Persistence.Repositories;
-using GrabBike.Api.SharedKernel;
+using GrabBike.Api;
+using GrabBike.Api.Data;
+using GrabBike.Api.Middleware;
+using GrabBike.Api.Repositories;
+using GrabBike.Api.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -57,20 +53,15 @@ builder.Services.AddScoped<IRideRepository, RideRepository>();
 builder.Services.AddScoped<IOfferRepository, OfferRepository>();
 
 builder.Services.AddScoped<IDevService, DevService>();
-builder.Services.AddScoped<IMapProvider, FakeMapProvider>();
 builder.Services.AddScoped<IMapService, MapService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
 builder.Services.AddScoped<IRideService, RideService>();
 builder.Services.AddScoped<IOfferService, OfferService>();
 
-builder.Services.AddScoped<IDriverSimulationService, DriverSimulationService>();
-builder.Services.AddScoped<IDispatchExpiryService, DispatchExpiryService>();
-builder.Services.AddSingleton<IRideWriteLock, RideWriteLock>();
+builder.Services.AddSingleton<RideWriteLock>();
 builder.Services.AddSingleton<IUserIdProvider, QueryUserIdProvider>();
-builder.Services.AddSingleton<IRideEventPublisher, SignalRRideEventPublisher>();
-builder.Services.AddSingleton<IRideNotifications, NotificationDelivery>();
-builder.Services.AddHostedService<DriverSimulationWorker>();
-builder.Services.AddHostedService<DispatchExpiryWorker>();
+builder.Services.AddSingleton<RideNotifier>();
+builder.Services.AddHostedService<DriverMovementService>();
 
 var app = builder.Build();
 

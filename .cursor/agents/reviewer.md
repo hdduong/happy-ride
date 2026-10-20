@@ -11,6 +11,5 @@ When invoked:
 
 1. Read the diff and the surrounding code it depends on.
 2. Look for bugs, missing error handling, duplicated logic, and exposed secrets.
-   Check `docs/architecture.md`: feature ownership, transport/persistence boundaries, and whether frontend components delegate state synchronization to shared session logic. Distinguish a behavior or dependency problem from a cosmetic folder preference.
 3. Report findings first, ordered as must-fix, should-fix, then optional.
 4. Name the file and the specific change for each finding. If the diff is sound, say that.

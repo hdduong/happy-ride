@@ -1,10 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const apiPort = process.env.E2E_API_PORT ?? '5080';
-const webPort = process.env.E2E_WEB_PORT ?? '3000';
-const apiUrl = `http://127.0.0.1:${apiPort}`;
-const webUrl = `http://localhost:${webPort}`;
-
 export default defineConfig({
   testDir: './tests',
   timeout: 180000,
@@ -15,16 +10,15 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   use: {
-    baseURL: webUrl,
+    baseURL: 'http://localhost:3000',
     actionTimeout: 20000,
     navigationTimeout: 60000,
     trace: 'retain-on-failure',
   },
   webServer: [
     {
-      command: `dotnet run --project ../src/GrabBike.Api --no-launch-profile --urls ${apiUrl}`,
-      url: `${apiUrl}/api/map-config`,
-      env: { Cors__AllowedOrigins: webUrl },
+      command: 'dotnet run --project ../src/GrabBike.Api --urls http://127.0.0.1:5080',
+      url: 'http://127.0.0.1:5080/api/map-config',
       name: 'api',
       reuseExistingServer: !process.env.CI,
       timeout: 300000,
@@ -32,9 +26,8 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: `npm --prefix ../web run dev -- --port ${webPort}`,
-      url: webUrl,
-      env: { NEXT_PUBLIC_API_BASE_URL: apiUrl },
+      command: 'npm --prefix ../web run dev',
+      url: 'http://127.0.0.1:3000',
       name: 'web',
       reuseExistingServer: !process.env.CI,
       timeout: 300000,

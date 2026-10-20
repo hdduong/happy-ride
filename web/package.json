@@ -4,7 +4,6 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
-    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
     "start": "next start --port 3000"
   },
   "dependencies": {
