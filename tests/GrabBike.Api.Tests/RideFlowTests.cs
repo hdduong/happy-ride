@@ -32,6 +32,14 @@ public class RideFlowTests
         Assert.Contains("\"/api/rides\"", document);
         Assert.Contains("\"/api/dev/users\"", document);
 
+        using var direct = fixture.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        foreach (var path in new[] { "/", "/scalar" })
+        {
+            var redirect = await direct.GetAsync(path);
+            Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
+            Assert.Equal("/scalar/v1", redirect.Headers.Location?.OriginalString);
+        }
+
         var scalar = await client.GetAsync("/scalar/v1");
         Assert.Equal(HttpStatusCode.OK, scalar.StatusCode);
         var page = await scalar.Content.ReadAsStringAsync();

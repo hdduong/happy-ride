@@ -113,7 +113,8 @@ if (app.Environment.IsDevelopment())
     {
         options.WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json");
     });
-    app.MapGet("/", () => Results.Redirect("/scalar")).ExcludeFromDescription();
+    app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
+    app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
 }
 
 app.UseCors();
