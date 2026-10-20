@@ -66,12 +66,25 @@ function GoogleOverlays({
       strokeColor: "#ffffff",
       strokeWeight: 4,
     });
+    const pulseCircle = pulse
+      ? new maps.Circle({
+          map,
+          center: { lat: pulse.lat, lng: pulse.lng },
+          radius: 80,
+          strokeColor: "#ffffff",
+          strokeOpacity: 0.85,
+          strokeWeight: 2,
+          fillOpacity: 0,
+        })
+      : null;
     const bounds = new maps.LatLngBounds();
-    for (const point of route.length > 0 ? route : [center, ...markers]) bounds.extend(point);
+    const points = route.length > 0 ? route : [center, ...markers];
+    for (const point of pulse ? [...points, pulse] : points) bounds.extend(point);
     if (!bounds.isEmpty()) map.fitBounds(bounds, 80);
     return () => {
       for (const marker of drawn) marker.setMap(null);
       line.setMap(null);
+      pulseCircle?.setMap(null);
     };
   }, [map, center, route, markers, pulse]);
   return null;

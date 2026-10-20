@@ -154,13 +154,18 @@ function LibreDarkMap({
       const maplibregl = module;
       current = markers.map((marker) => {
         const element = document.createElement("div");
-        element.className = marker.kind === "bike" ? "map-bike" : marker.kind === "dropoff" ? "map-dropoff" : "map-pickup";
-        if (marker.kind === "bike" && marker.heading != null) element.style.transform = `rotate(${marker.heading}deg)`;
+        const glyph = document.createElement("div");
+        glyph.className = marker.kind === "bike" ? "map-bike" : marker.kind === "dropoff" ? "map-dropoff" : "map-pickup";
+        if (marker.kind === "bike" && marker.heading != null) glyph.style.transform = `rotate(${marker.heading}deg)`;
+        element.appendChild(glyph);
         return new maplibregl.Marker({ element }).setLngLat([marker.lng, marker.lat]).addTo(map);
       });
       if (pulse) {
         const element = document.createElement("div");
-        element.className = "map-pulse";
+        element.className = "map-pulse-anchor";
+        const ring = document.createElement("div");
+        ring.className = "map-pulse";
+        element.appendChild(ring);
         current.push(new maplibregl.Marker({ element }).setLngLat([pulse.lng, pulse.lat]).addTo(map));
       }
     });

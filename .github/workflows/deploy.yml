@@ -101,8 +101,8 @@ jobs:
           GOOGLE_MAPS_BROWSER_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
         run: |
           if [ -z "$POSTGRES_ADMIN_PASSWORD" ]; then
-            echo "POSTGRES_ADMIN_PASSWORD is not set. Skipping Bicep. Add it before the API can use Azure Postgres."
-            exit 0
+            echo "POSTGRES_ADMIN_PASSWORD is not set. The API requires Azure Postgres, so deployment stops here."
+            exit 1
           fi
           az deployment group create \
             --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
@@ -116,6 +116,8 @@ jobs:
           provider="Fake"
           if [ -n "$VIETMAP_API_KEY" ] && [ -n "$VIETMAP_TILEMAP_KEY" ]; then
             provider="VietMap"
+          elif [ -n "$GOOGLE_MAPS_API_KEY" ] && [ -n "$GOOGLE_MAPS_BROWSER_KEY" ]; then
+            provider="Google"
           fi
           az webapp config appsettings set \
             --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
