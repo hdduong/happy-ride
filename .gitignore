@@ -12,3 +12,10 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+bin/
+obj/
+TestResults/
+.next/
+playwright-report/
+test-results/
+

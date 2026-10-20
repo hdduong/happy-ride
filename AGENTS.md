@@ -21,7 +21,12 @@ Delegate to `planner` before a multi-step change, to `implementer` for the code,
 - Stay inside the requested task. Do not invent a product, stack, or architecture.
 - Do not commit secrets. `.env` files, keys, and credential files stay untracked.
 - Work on a branch and open a pull request. Leave `main` as the integration branch.
-- There is no application code yet. When a toolchain is added, record the install, run, and test commands in this file and in `.cursor/environment.json`.
+- API and web commands:
+  - API: `dotnet run --project src/GrabBike.Api --launch-profile http` (http://localhost:5080)
+  - Web: `npm install` then `npm run dev` in `web/` (http://localhost:3000)
+  - API tests: `dotnet test`
+  - Browser test: `npx playwright test` in `e2e/` (starts the API and the web app)
+- Mock riders and drivers are seeded in the API. Open `/rider?as=11111111-1111-1111-1111-111111111111` and `/driver?as=33333333-3333-3333-3333-333333333333` in two browsers.
 
 ## Cursor Cloud specific instructions
 
