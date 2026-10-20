@@ -34,5 +34,5 @@ Delegate to `planner` before a multi-step change, to `implementer` for the code,
 ## Cursor Cloud specific instructions
 
 - Install locked JavaScript dependencies with `npm ci` in `web/` and `e2e/`.
-- Do not leave long-running services behind. Playwright starts and stops its API and web servers; use `E2E_API_PORT` and `E2E_WEB_PORT` when the default ports are already in use.
+- Do not leave long-running services behind. Playwright starts and stops its API and web servers. Set `E2E_API_PORT` and `E2E_WEB_PORT` when 5080 or 3000 are already in use; those overrides start new servers instead of reusing the dev processes.
 - After implementation, delegate to `verifier`. If no test command exists, say so and describe the check that was actually run.
