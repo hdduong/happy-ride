@@ -2,7 +2,7 @@
 
 import { getUsers, messageFrom } from "@/lib/api";
 import type { DevUser } from "@/lib/types";
-import { forcedUserId, homeForRole, isDriverRole, rememberUser } from "@/lib/user";
+import { forcedUserId, homeForRole, isDriverRole, rememberPersona } from "@/lib/user";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -21,7 +21,10 @@ export function UserPicker() {
         setUsers(list);
         if (!forced) return;
         const match = list.find((user) => user.id === forced);
-        if (match) router.replace(homeForRole(match.role));
+        if (match) {
+          rememberPersona(match.id, match.city);
+          router.replace(homeForRole(match.role));
+        }
       })
       .catch((reason: unknown) => {
         if (!cancel) setError(messageFrom(reason));
@@ -35,7 +38,7 @@ export function UserPicker() {
   }, [router]);
 
   function choose(user: DevUser) {
-    rememberUser(user.id);
+    rememberPersona(user.id, user.city);
     router.push(homeForRole(user.role));
   }
 

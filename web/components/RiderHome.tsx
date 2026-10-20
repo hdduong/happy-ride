@@ -14,7 +14,8 @@ import {
   messageFrom,
 } from "@/lib/api";
 import { formatEta, formatKm, formatMinutes, formatVnd, initials, minutesFromSeconds, shortPlace } from "@/lib/format";
-import { bearing, DEFAULT_PICKUP, haversineMeters, isPlotted, linePoints, pickupForCity } from "@/lib/geo";
+import { bearing, haversineMeters, isPlotted, linePoints, pickupForCity } from "@/lib/geo";
+import { rememberPersona, storedPersona } from "@/lib/user";
 import { openRideConnection } from "@/lib/signalr";
 import { applyRiderUpdate, preferForward, withEpoch } from "@/lib/rides";
 import type { DriverLocation, Place, Quote, RideView } from "@/lib/types";
@@ -32,19 +33,28 @@ export function RiderHome({ userId }: { userId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [quoting, setQuoting] = useState(false);
-  const [home, setHome] = useState(DEFAULT_PICKUP);
+  const [homeReady, setHomeReady] = useState(false);
+  const [home, setHome] = useState(() => pickupForCity(undefined));
   const searchSeq = useRef(0);
   const epoch = useRef(0);
   const ignored = useRef(new Set<string>());
-  const allowSearch = !ride;
+  const allowSearch = !ride && homeReady;
 
   useEffect(() => {
     let cancel = false;
+    const cached = storedPersona();
+    if (cached?.id === userId) {
+      setHome(pickupForCity(cached.city));
+      setHomeReady(true);
+    }
     getUsers(userId)
       .then((users) => {
         if (cancel) return;
         const person = users.find((user) => user.id === userId);
-        setHome(pickupForCity(person?.city));
+        if (!person) return;
+        rememberPersona(person.id, person.city);
+        setHome(pickupForCity(person.city));
+        setHomeReady(true);
       })
       .catch(() => undefined);
     return () => {
@@ -117,6 +127,7 @@ export function RiderHome({ userId }: { userId: string }) {
   }, [allowSearch, home.lat, home.lng, query, userId]);
 
   async function choosePlace(suggestion: Place) {
+    if (!homeReady) return;
     setError(null);
     setQuoting(true);
     setQuote(null);
@@ -261,6 +272,7 @@ export function RiderHome({ userId }: { userId: string }) {
   let sheet = (
     <SearchSheet
       pickupName={home.name}
+      ready={homeReady}
       query={query}
       results={results}
       searching={searching}
@@ -464,6 +476,7 @@ function riderEta(ride: RideView, live: DriverLocation | null): string {
 
 function SearchSheet({
   pickupName,
+  ready,
   query,
   results,
   searching,
@@ -473,6 +486,7 @@ function SearchSheet({
   onChoose,
 }: {
   pickupName: string;
+  ready: boolean;
   query: string;
   results: Place[];
   searching: boolean;
@@ -492,7 +506,8 @@ function SearchSheet({
       <input
         className="where"
         data-testid="where-to"
-        placeholder="Where to?"
+        placeholder={ready ? "Where to?" : "Loading your city…"}
+        disabled={!ready}
         aria-label="Where to?"
         value={query}
         autoComplete="off"

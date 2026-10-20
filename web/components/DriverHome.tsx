@@ -60,6 +60,7 @@ export function DriverHome({ userId }: { userId: string }) {
       },
       onLocation: (location) => setLive(location),
       onOffer: (offer) => {
+        if (offerClosed.current.has(offer.offerId)) return;
         offerSeen.current.set(offer.offerId, Date.now());
         setOffers((list) => upsertOffer(list, offer));
         setNotice(null);

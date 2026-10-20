@@ -1,4 +1,5 @@
 export const USER_STORAGE_KEY = "happy-ride-user";
+const CITY_STORAGE_KEY = "happy-ride-city";
 
 export function isDriverRole(role: string): boolean {
   return role.toLowerCase() === "driver";
@@ -10,6 +11,22 @@ export function homeForRole(role: string): "/rider" | "/driver" {
 
 export function rememberUser(userId: string): void {
   sessionStorage.setItem(USER_STORAGE_KEY, userId);
+}
+
+export function rememberPersona(userId: string, city: string): void {
+  rememberUser(userId);
+  sessionStorage.setItem(CITY_STORAGE_KEY, city);
+}
+
+export function storedPersona(): { id: string; city: string } | null {
+  try {
+    const id = sessionStorage.getItem(USER_STORAGE_KEY);
+    const city = sessionStorage.getItem(CITY_STORAGE_KEY);
+    if (!id || !city) return null;
+    return { id, city };
+  } catch {
+    return null;
+  }
 }
 
 function queryUserId(): string | null {
