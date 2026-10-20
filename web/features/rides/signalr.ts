@@ -10,8 +10,14 @@ export function openRideConnection(userId: string, handlers: RideHandlers): () =
       .withUrl(`${apiBase()}/hubs/ride?userId=${encodeURIComponent(userId)}`, {
         headers: { "X-User-Id": userId },
       })
-      .withAutomaticReconnect([0, 2000, 5000, 10000])
-      .configureLogging(LogLevel.Warning)
+      .withAutomaticReconnect()
+      .configureLogging({
+        log(level: LogLevel, message: string) {
+          if (level < LogLevel.Warning) return;
+          // Next.js treats console.error as a page issue. A dropped socket while the API restarts is expected.
+          console.debug(message);
+        },
+      })
       .build();
 
     function register<T>(event: string, parse: (payload: unknown) => T | null, handle: (value: T) => void) {

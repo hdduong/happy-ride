@@ -23,6 +23,22 @@ public class RideFlowTests
     private static readonly Pin Bitexco = new(10.77175, 106.70446, "Bitexco Financial Tower, 2 Hai Trieu, District 1");
 
     [Fact]
+    public async Task OpenApi_document_feeds_swagger_and_scalar()
+    {
+        await using var fixture = new ApiFactory();
+        var client = fixture.CreateClient();
+
+        var document = await client.GetStringAsync("/swagger/v1/swagger.json");
+        Assert.Contains("\"/api/rides\"", document);
+        Assert.Contains("\"/api/dev/users\"", document);
+
+        var scalar = await client.GetAsync("/scalar/v1");
+        Assert.Equal(HttpStatusCode.OK, scalar.StatusCode);
+        var page = await scalar.Content.ReadAsStringAsync();
+        Assert.Contains("swagger/v1/swagger.json", page);
+    }
+
+    [Fact]
     public async Task Quote_for_Ben_Thanh_to_Bitexco_returns_distance_fare_and_route()
     {
         await using var fixture = new ApiFactory();
