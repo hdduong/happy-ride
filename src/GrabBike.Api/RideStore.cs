@@ -243,7 +243,8 @@ public sealed class RideStore
                 return new ApiResult.AcceptConflict("Taken");
             if (driver.CurrentRideId is not null || driver.Status == DriverStatus.OnTrip)
                 return new ApiResult.AcceptConflict("Busy");
-            if (offer.Status != OfferStatus.Pending || offer.ExpiresAt <= now)
+            // A click that lands after ExpiresAt still wins until the timeout tick closes the offer.
+            if (offer.Status != OfferStatus.Pending)
                 return new ApiResult.AcceptConflict("Closed");
 
             ride.Status = RideStatus.Accepted;

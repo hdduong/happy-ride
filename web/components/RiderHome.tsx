@@ -107,9 +107,9 @@ export function RiderHome({ userId }: { userId: string }) {
   useEffect(() => {
     if (!allowSearch) return;
     const seq = ++searchSeq.current;
+    setResults([]);
     const text = query.trim();
     if (!text) {
-      setResults([]);
       setSearching(false);
       return;
     }
