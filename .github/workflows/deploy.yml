@@ -1,0 +1,145 @@
+name: Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy to Azure production
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  confirm:
+    name: Confirm deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the deploy checkbox
+        run: |
+          if [ "${{ github.event.inputs.deploy }}" != "true" ]; then
+            echo "Check Deploy to Azure production, then click Run workflow again."
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy
+    needs: confirm
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: https://app-grabbike-web.azurewebsites.net
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Version this commit
+        id: meta
+        run: |
+          echo "version=v1.0.$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Require a green Build and CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.meta.outputs.sha }}
+        run: |
+          bash .github/scripts/require-green.sh "$SHA" build.yml
+          bash .github/scripts/require-green.sh "$SHA" ci.yml
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Publish the API
+        run: dotnet publish src/GrabBike.Api/GrabBike.Api.csproj --configuration Release --runtime linux-x64 --self-contained true --output publish/api
+
+      - name: Build the web app
+        working-directory: web
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://app-grabbike-api.azurewebsites.net
+        run: |
+          npm ci
+          npm run build
+          npm prune --omit=dev
+          rm -rf .next/cache
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Prepare App Service
+        run: bash .github/scripts/deploy-azure.sh
+
+      - name: Deploy the API
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: app-grabbike-api
+          package: publish/api
+
+      - name: Deploy the web app
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: app-grabbike-web
+          package: web
+
+      - name: Publish the version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHA: ${{ steps.meta.outputs.sha }}
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists"
+          else
+            gh release create "$VERSION" \
+              --target "$SHA" \
+              --title "$VERSION" \
+              --notes "Production deployment of ${SHA}. API: https://app-grabbike-api.azurewebsites.net Web: https://app-grabbike-web.azurewebsites.net"
+          fi
+
+      - name: Update the version badge
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 .github/scripts/update-version-badge.py
+          if git diff --quiet -- README.md; then
+            echo "Version badge already current"
+            exit 0
+          fi
+          git add README.md
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Show production version ${VERSION}"
+          git push origin HEAD:main || echo "Could not push the version badge. The release still records ${VERSION}."
+
+      - name: Close the deployment request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          for number in $(gh issue list --label deployment-request --state open --json number --jq '.[].number'); do
+            gh issue comment "$number" --body "Deployed ${VERSION}. API: https://app-grabbike-api.azurewebsites.net Web: https://app-grabbike-web.azurewebsites.net"
+            gh issue close "$number" --reason completed
+          done

@@ -26,6 +26,7 @@ Delegate to `planner` before a multi-step change, to `implementer` for the code,
   - Web: `npm install` then `npm run dev` in `web/` (http://localhost:3000)
   - API tests: `dotnet test`
   - Browser test: `npx playwright test` in `e2e/` (starts the API and the web app)
+  - GitHub Actions: `Build` compiles the API and web, `CI` runs both test suites, and `Deployment` publishes to Azure only after the Run workflow button
 - Mock riders and drivers are seeded in the API. Open `/rider?as=11111111-1111-1111-1111-111111111111` and `/driver?as=33333333-3333-3333-3333-333333333333` in two browsers.
 
 ## Cursor Cloud specific instructions
