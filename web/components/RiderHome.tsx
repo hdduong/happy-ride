@@ -16,7 +16,7 @@ import {
 import { formatEta, formatKm, formatMinutes, formatVnd, initials, minutesFromSeconds, shortPlace } from "@/lib/format";
 import { bearing, DEFAULT_PICKUP, haversineMeters, isPlotted, linePoints, pickupForCity } from "@/lib/geo";
 import { openRideConnection } from "@/lib/signalr";
-import { applyRiderUpdate, isActiveStatus, preferForward, withEpoch } from "@/lib/rides";
+import { applyRiderUpdate, preferForward, withEpoch } from "@/lib/rides";
 import type { DriverLocation, Place, Quote, RideView } from "@/lib/types";
 import { MapCanvas, type MapMarker } from "@/components/MapCanvas";
 import { ErrorLine, PrimaryButton, Stage, TextButton } from "@/components/ui";
@@ -55,8 +55,7 @@ export function RiderHome({ userId }: { userId: string }) {
   useEffect(() => {
     return openRideConnection(userId, {
       onRide: (incoming) => {
-        if (ignored.current.has(incoming.rideId) && !isActiveStatus(incoming.status)) return;
-        if (isActiveStatus(incoming.status)) ignored.current.delete(incoming.rideId);
+        if (ignored.current.has(incoming.rideId)) return;
         setRide((previous) => preferForward(previous, incoming));
         setQuote(null);
         setDestination(null);
@@ -72,9 +71,7 @@ export function RiderHome({ userId }: { userId: string }) {
       try {
         const incoming = await getCurrentRide(userId);
         if (stop || stamp !== epoch.current) return;
-        const hidden =
-          incoming !== null && ignored.current.has(incoming.rideId) && !isActiveStatus(incoming.status);
-        if (incoming && isActiveStatus(incoming.status)) ignored.current.delete(incoming.rideId);
+        const hidden = incoming !== null && ignored.current.has(incoming.rideId);
         setRide((previous) => applyRiderUpdate(previous, hidden ? null : incoming, ignored.current));
         if (!hidden && incoming) {
           setQuote(null);
