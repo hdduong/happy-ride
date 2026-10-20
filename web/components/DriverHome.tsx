@@ -50,6 +50,7 @@ export function DriverHome({ userId }: { userId: string }) {
   useEffect(() => {
     return openRideConnection(userId, {
       onRide: (incoming) => {
+        if (rideClosed.current.has(incoming.rideId) && isActiveStatus(incoming.status)) return;
         if (incoming.status === "Cancelled") setNotice("Ride cancelled");
         if (!isActiveStatus(incoming.status)) {
           rideClosed.current.set(incoming.rideId, Date.now());
