@@ -78,8 +78,9 @@ export function useRiderBooking(userId: string) {
       return;
     }
     setSearching(true);
+    const bias = editingPickup ? home : pickup;
     const handle = window.setTimeout(() => {
-      void autocomplete(userId, text, home.lat, home.lng)
+      void autocomplete(userId, text, bias.lat, bias.lng)
         .then((places) => {
           if (searchSeq.current === seq) setResults(places);
         })
@@ -93,7 +94,7 @@ export function useRiderBooking(userId: string) {
         });
     }, 300);
     return () => window.clearTimeout(handle);
-  }, [allowSearch, home.lat, home.lng, searchText, userId]);
+  }, [allowSearch, editingPickup, home.lat, home.lng, pickup.lat, pickup.lng, searchText, userId]);
 
   async function choosePlace(suggestion: Place) {
     if (!homeReady) return;
