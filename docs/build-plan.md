@@ -4,6 +4,8 @@ Spec for coding agents. Decisions come from `project-context.md`; the brief is `
 
 ## 1. Architecture
 
+The current demo's feature boundaries and implementation limits are documented in [architecture.md](architecture.md). The services and integrations below describe the target MVP.
+
 ### 1.1 Solution layout (one repo)
 
 ```
@@ -20,8 +22,13 @@ src/GrabBike.Api/              # single ASP.NET Core (.NET 10) project, vertical
 tests/GrabBike.Api.Tests/      # xUnit + Testcontainers (Postgres)
 web/                           # Next.js App Router, output: 'export'
   app/page.tsx (user picker)  app/rider/  app/driver/  app/sim/
-  components/map/MapView.tsx, MapLibreCanvas.tsx (VietMap + Fake), GoogleCanvas.tsx
-  lib/api.ts, lib/signalr.ts, lib/user.ts
+  features/rider/       booking hook and rider components
+  features/driver/      dashboard hook and driver components
+  features/rides/       shared ride session, polling, realtime, contracts
+  features/maps/        map components, geometry, places and quotes
+  features/identity/    demo user picker and route guard
+  shared/api/           common HTTP transport
+  shared/ui/            reusable presentation components
 docker-compose.yml             # postgis/postgis:16 for local dev
 ```
 

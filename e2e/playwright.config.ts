@@ -1,5 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const apiPort = process.env.E2E_API_PORT ?? '5080';
+const webPort = process.env.E2E_WEB_PORT ?? '3000';
+const apiUrl = `http://127.0.0.1:${apiPort}`;
+const webUrl = `http://localhost:${webPort}`;
+// An already-running dev server was not started with these overrides.
+// Reusing it would leave the web app on port 5080 or the API with the old CORS origin.
+const reuseDevServers = !process.env.CI
+  && process.env.E2E_API_PORT === undefined
+  && process.env.E2E_WEB_PORT === undefined;
+
 export default defineConfig({
   testDir: './tests',
   timeout: 180000,
@@ -10,26 +20,29 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: webUrl,
     actionTimeout: 20000,
     navigationTimeout: 60000,
     trace: 'retain-on-failure',
   },
   webServer: [
     {
-      command: 'dotnet run --project ../src/GrabBike.Api --urls http://127.0.0.1:5080',
-      url: 'http://127.0.0.1:5080/api/map-config',
+      command: `dotnet run --project ../src/GrabBike.Api --no-launch-profile --urls ${apiUrl}`,
+      url: `${apiUrl}/api/map-config`,
+      env: { Cors__AllowedOrigins: webUrl },
       name: 'api',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: reuseDevServers,
       timeout: 300000,
       stdout: 'pipe',
       stderr: 'pipe',
     },
     {
-      command: 'npm --prefix ../web run dev',
-      url: 'http://127.0.0.1:3000',
+      command: `npm exec -- next dev --port ${webPort}`,
+      cwd: '../web',
+      url: webUrl,
+      env: { NEXT_PUBLIC_API_BASE_URL: apiUrl },
       name: 'web',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: reuseDevServers,
       timeout: 300000,
       stdout: 'pipe',
       stderr: 'pipe',
