@@ -184,13 +184,19 @@ public sealed class RideStore
                 return assigned is not null && IsActive(assigned.Status) ? ToView(assigned) : null;
             }
 
-            Ride? latest = null;
+            Ride? active = null;
+            Ride? terminal = null;
             foreach (var ride in _rides)
             {
-                if (ride.RiderId == userId && IsActive(ride.Status))
-                    latest = ride;
+                if (ride.RiderId != userId)
+                    continue;
+                if (IsActive(ride.Status))
+                    active = ride;
+                else if (ride.Status is RideStatus.NoDriver or RideStatus.Cancelled or RideStatus.Completed)
+                    terminal = ride;
             }
 
+            var latest = active ?? terminal;
             return latest is null ? null : ToView(latest);
         }
     }

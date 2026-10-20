@@ -128,24 +128,27 @@ export function RiderHome({ userId }: { userId: string }) {
 
   async function choosePlace(suggestion: Place) {
     if (!homeReady) return;
+    const seq = ++searchSeq.current;
     setError(null);
     setQuoting(true);
     setQuote(null);
     try {
       const place = await getPlace(userId, suggestion.id);
+      if (searchSeq.current !== seq) return;
       const nextQuote = await createQuote(
         userId,
         { lat: home.lat, lng: home.lng, address: home.name },
         { lat: place.lat, lng: place.lng, address: place.name || place.address },
       );
+      if (searchSeq.current !== seq) return;
       setDestination(place);
       setQuote(nextQuote);
       setQuery("");
       setResults([]);
     } catch (reason: unknown) {
-      setError(messageFrom(reason));
+      if (searchSeq.current === seq) setError(messageFrom(reason));
     } finally {
-      setQuoting(false);
+      if (searchSeq.current === seq) setQuoting(false);
     }
   }
 
@@ -279,6 +282,8 @@ export function RiderHome({ userId }: { userId: string }) {
       quoting={quoting}
       error={error}
       onQuery={(value) => {
+        searchSeq.current += 1;
+        setQuoting(false);
         setQuery(value);
         setError(null);
         setSearching(value.trim().length > 0);
@@ -507,7 +512,7 @@ function SearchSheet({
         className="where"
         data-testid="where-to"
         placeholder={ready ? "Where to?" : "Loading your city…"}
-        disabled={!ready}
+        disabled={!ready || quoting}
         aria-label="Where to?"
         value={query}
         autoComplete="off"

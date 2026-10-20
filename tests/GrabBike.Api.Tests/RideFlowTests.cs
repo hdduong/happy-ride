@@ -205,6 +205,8 @@ public class RideFlowTests
             HttpStatusCode.OK);
         Assert.Equal("NoDriver", ride.GetProperty("status").GetString());
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), created.GetProperty("rideId").GetGuid()));
+        var current = await Read(await fixture.Client(An).GetAsync("/api/rides/current"), HttpStatusCode.OK);
+        Assert.Equal("NoDriver", current.GetProperty("status").GetString());
     }
 
     [Fact]
