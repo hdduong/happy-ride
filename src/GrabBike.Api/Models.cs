@@ -196,4 +196,5 @@ public abstract record ApiResult
     public sealed record Empty(int Status) : ApiResult;
     public sealed record TransitionConflict(string From, string To) : ApiResult;
     public sealed record AcceptConflict(string Reason) : ApiResult;
+    public sealed record ActiveRideConflict(Guid RideId) : ApiResult;
 }

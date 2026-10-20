@@ -128,6 +128,12 @@ public sealed class RideStore
             if (quote is null)
                 return new ApiResult.Empty(StatusCodes.Status404NotFound);
 
+            foreach (var existing in _rides)
+            {
+                if (existing.RiderId == riderId && IsActive(existing.Status))
+                    return new ApiResult.ActiveRideConflict(existing.Id);
+            }
+
             var ride = new Ride
             {
                 Id = Guid.NewGuid(),

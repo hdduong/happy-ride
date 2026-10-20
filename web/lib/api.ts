@@ -31,6 +31,7 @@ export function readApiMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const body = payload as Record<string, unknown>;
   if (typeof body.reason === "string" && body.reason.trim()) return body.reason.trim();
+  if (body.error === "ActiveRide") return "You already have an active ride";
   if (typeof body.error === "string" && body.error.trim()) return body.error.trim();
   return null;
 }

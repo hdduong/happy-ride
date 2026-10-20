@@ -164,6 +164,29 @@ public class RideFlowTests
     }
 
     [Fact]
+    public async Task Second_ride_while_one_is_active_is_rejected()
+    {
+        await using var fixture = new ApiFactory();
+        var an = fixture.Client(An);
+        var rideId = await CreateRide(an);
+        var quote = await Read(await an.PostAsJsonAsync("/api/quotes", new
+        {
+            pickup = BenThanh,
+            dropoff = Bitexco,
+        }), HttpStatusCode.Created);
+        var again = await an.PostAsJsonAsync("/api/rides", new
+        {
+            quoteId = quote.GetProperty("quoteId").GetGuid(),
+        });
+        var body = await Read(again, HttpStatusCode.Conflict);
+        Assert.Equal("ActiveRide", body.GetProperty("error").GetString());
+        Assert.Equal(rideId, body.GetProperty("rideId").GetGuid());
+
+        var current = await Read(await an.GetAsync("/api/rides/current"), HttpStatusCode.OK);
+        Assert.Equal(rideId, current.GetProperty("rideId").GetGuid());
+    }
+
+    [Fact]
     public async Task Ride_outside_every_cluster_becomes_NoDriver()
     {
         await using var fixture = new ApiFactory();

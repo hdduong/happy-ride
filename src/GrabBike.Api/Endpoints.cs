@@ -169,6 +169,9 @@ public static class GrabBikeEndpoints
             ApiResult.AcceptConflict accept => Results.Json(
                 new { reason = accept.Reason },
                 statusCode: StatusCodes.Status409Conflict),
+            ApiResult.ActiveRideConflict active => Results.Json(
+                new { error = "ActiveRide", rideId = active.RideId },
+                statusCode: StatusCodes.Status409Conflict),
             ApiResult.Empty empty when empty.Status == StatusCodes.Status204NoContent => Results.NoContent(),
             ApiResult.Empty empty when empty.Status == StatusCodes.Status200OK => Results.Ok(),
             ApiResult.Empty empty => Results.StatusCode(empty.Status),
