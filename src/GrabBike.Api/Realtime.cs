@@ -1,3 +1,4 @@
+using GrabBike.Api.Services;
 using Microsoft.AspNetCore.SignalR;
 
 namespace GrabBike.Api;
@@ -48,7 +49,7 @@ public sealed class RideNotifier(IHubContext<RideHub> hub)
 }
 
 public sealed class DriverMovementService(
-    RideStore store,
+    IServiceScopeFactory scopes,
     RideNotifier notifier,
     ILogger<DriverMovementService> logger) : BackgroundService
 {
@@ -64,7 +65,9 @@ public sealed class DriverMovementService(
                 List<OutboundEvent> events;
                 try
                 {
-                    events = store.Tick(DateTimeOffset.UtcNow, StepMeters);
+                    await using var scope = scopes.CreateAsyncScope();
+                    var rides = scope.ServiceProvider.GetRequiredService<IRideService>();
+                    events = await rides.TickAsync(DateTimeOffset.UtcNow, StepMeters, stoppingToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

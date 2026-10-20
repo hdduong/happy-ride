@@ -67,9 +67,9 @@ public sealed class Place
 
 public sealed class GeoPoint
 {
-    public double Lat { get; init; }
-    public double Lng { get; init; }
-    public string Address { get; init; } = "";
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+    public string Address { get; set; } = "";
 }
 
 public sealed record GeoRoute(string Type, double[][] Coordinates);
@@ -78,12 +78,12 @@ public sealed class Quote
 {
     public required Guid Id { get; init; }
     public required string Provider { get; init; }
-    public required GeoPoint Pickup { get; init; }
-    public required GeoPoint Dropoff { get; init; }
+    public required GeoPoint Pickup { get; set; }
+    public required GeoPoint Dropoff { get; set; }
     public required int DistanceM { get; init; }
     public required int DurationS { get; init; }
     public required int FareVnd { get; init; }
-    public required GeoRoute Route { get; init; }
+    public required GeoRoute Route { get; set; }
 }
 
 public sealed class Ride
@@ -93,13 +93,14 @@ public sealed class Ride
     public Guid? DriverId { get; set; }
     public required Guid QuoteId { get; init; }
     public RideStatus Status { get; set; }
-    public required GeoPoint Pickup { get; init; }
-    public required GeoPoint Dropoff { get; init; }
+    public required GeoPoint Pickup { get; set; }
+    public required GeoPoint Dropoff { get; set; }
     public required int DistanceM { get; init; }
     public required int DurationS { get; init; }
     public required int FareVnd { get; init; }
-    public required GeoRoute Route { get; init; }
+    public required GeoRoute Route { get; set; }
     public int Round { get; set; } = 1;
+    public long CreatedAt { get; set; }
     public int SegmentIndex { get; set; }
     public double SegmentOffsetM { get; set; }
 }
