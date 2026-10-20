@@ -29,6 +29,7 @@ export function DriverHome({ userId }: { userId: string }) {
   const [busy, setBusy] = useState(false);
   const epoch = useRef(0);
   const offerSeen = useRef(new Map<string, number>());
+  const offerClosed = useRef(new Map<string, number>());
 
   useEffect(() => {
     let cancel = false;
@@ -59,6 +60,7 @@ export function DriverHome({ userId }: { userId: string }) {
         setNotice(null);
       },
       onOfferClosed: (closed) => {
+        offerClosed.current.set(closed.offerId, Date.now());
         setOffers((list) => list.filter((offer) => offer.offerId !== closed.offerId));
       },
     });
@@ -72,7 +74,9 @@ export function DriverHome({ userId }: { userId: string }) {
       try {
         const [pending, current] = await Promise.all([getPendingOffers(userId), getCurrentRide(userId)]);
         if (stop || stamp !== epoch.current) return;
-        setOffers((existing) => mergePolledOffers(existing, pending, started, offerSeen.current));
+        setOffers((existing) =>
+          mergePolledOffers(existing, pending, started, offerSeen.current, offerClosed.current),
+        );
         setRide((previous) => applyDriverRide(previous, current));
       } catch {
         // Polling is the backup when a hub event is missed.
@@ -92,7 +96,12 @@ export function DriverHome({ userId }: { userId: string }) {
     try {
       const accepted = await withEpoch(epoch, () => acceptOffer(userId, offer.offerId));
       setRide((previous) => preferForward(previous, accepted));
-      setOffers((list) => list.filter((item) => item.rideId !== accepted.rideId));
+      setOffers((list) => {
+        for (const item of list) {
+          if (item.rideId === accepted.rideId) offerClosed.current.set(item.offerId, Date.now());
+        }
+        return list.filter((item) => item.rideId !== accepted.rideId);
+      });
       setNotice(null);
     } catch (reason: unknown) {
       setError(messageFrom(reason));
@@ -105,9 +114,11 @@ export function DriverHome({ userId }: { userId: string }) {
     setBusy(true);
     setError(null);
     try {
+      offerClosed.current.set(offer.offerId, Date.now());
       await withEpoch(epoch, () => declineOffer(userId, offer.offerId));
       setOffers((list) => list.filter((item) => item.offerId !== offer.offerId));
     } catch (reason: unknown) {
+      offerClosed.current.delete(offer.offerId);
       setError(messageFrom(reason));
     } finally {
       setBusy(false);
@@ -331,10 +342,13 @@ function mergePolledOffers(
   incoming: Offer[],
   started: number,
   seen: Map<string, number>,
+  closed: Map<string, number>,
 ): Offer[] {
+  const fresh = incoming.filter((offer) => !closed.has(offer.offerId));
   const raced = existing.filter((offer) => {
+    if (closed.has(offer.offerId)) return false;
     const at = seen.get(offer.offerId) ?? 0;
-    return at > started && !incoming.some((item) => item.offerId === offer.offerId);
+    return at > started && !fresh.some((item) => item.offerId === offer.offerId);
   });
-  return [...incoming, ...raced];
+  return [...fresh, ...raced];
 }
