@@ -51,6 +51,8 @@ public sealed class ServiceBusDispatchWorker(
         else
         {
             events = await RunAsync(message, args.CancellationToken);
+            foreach (var offer in events.OfType<OutboundEvent.OfferReceived>().Select(item => item.Offer).DistinctBy(offer => (offer.RideId, offer.Round)))
+                await ScheduleTimeoutAsync(new DispatchMessage.Requested(offer.RideId, offer.Round), args.CancellationToken);
         }
 
         await notifications.DeliverAsync(events, args.CancellationToken);

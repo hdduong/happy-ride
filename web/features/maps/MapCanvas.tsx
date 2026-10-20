@@ -130,8 +130,12 @@ function LibreDarkMap({
     const points = [...route, ...markers];
     if (pulse) points.push(pulse);
     if (points.length === 0) points.push(center);
-    if (points.length === 0) return;
     void import("maplibre-gl").then((module) => {
+      if (points.length < 2) {
+        const only = points[0] ?? center;
+        map.jumpTo({ center: [only.lng, only.lat], zoom: 15 });
+        return;
+      }
       const bounds = new module.LngLatBounds();
       for (const point of points) bounds.extend([point.lng, point.lat]);
       map.fitBounds(bounds, { padding: { top: 80, bottom: 280, left: 48, right: 48 }, maxZoom: 16, duration: 0 });
