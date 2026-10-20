@@ -30,6 +30,7 @@ export function DriverHome({ userId }: { userId: string }) {
   const epoch = useRef(0);
   const offerSeen = useRef(new Map<string, number>());
   const offerClosed = useRef(new Map<string, number>());
+  const rideClosed = useRef(new Map<string, number>());
 
   useEffect(() => {
     let cancel = false;
@@ -50,7 +51,10 @@ export function DriverHome({ userId }: { userId: string }) {
     return openRideConnection(userId, {
       onRide: (incoming) => {
         if (incoming.status === "Cancelled") setNotice("Ride cancelled");
-        if (!isActiveStatus(incoming.status)) setLive(null);
+        if (!isActiveStatus(incoming.status)) {
+          rideClosed.current.set(incoming.rideId, Date.now());
+          setLive(null);
+        }
         setRide((previous) => applyDriverRide(previous, incoming));
       },
       onLocation: (location) => setLive(location),
@@ -77,7 +81,10 @@ export function DriverHome({ userId }: { userId: string }) {
         setOffers((existing) =>
           mergePolledOffers(existing, pending, started, offerSeen.current, offerClosed.current),
         );
-        setRide((previous) => applyDriverRide(previous, current));
+        setRide((previous) => {
+          if (current && rideClosed.current.has(current.rideId)) return previous;
+          return applyDriverRide(previous, current);
+        });
       } catch {
         // Polling is the backup when a hub event is missed.
       }
