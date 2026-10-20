@@ -56,9 +56,11 @@ function GoogleOverlays({
     const drawn: google.maps.Marker[] = markers.map((marker) => new maps.Marker({
       map,
       position: { lat: marker.lat, lng: marker.lng },
-      icon: marker.kind === "dropoff"
-        ? { path: maps.SymbolPath.CIRCLE, scale: 7, fillColor: "#fff", fillOpacity: 1, strokeColor: "#000", strokeWeight: 2 }
-        : undefined,
+      icon: marker.kind === "bike"
+        ? { path: maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 5, fillColor: "#fff", fillOpacity: 1, strokeWeight: 1, rotation: marker.heading ?? 0 }
+        : marker.kind === "dropoff"
+          ? { path: maps.SymbolPath.CIRCLE, scale: 7, fillColor: "#fff", fillOpacity: 1, strokeColor: "#000", strokeWeight: 2 }
+          : undefined,
     }));
     const line = new maps.Polyline({
       map,

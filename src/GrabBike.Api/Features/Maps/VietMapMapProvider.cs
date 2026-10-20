@@ -109,7 +109,7 @@ public static class VietMapResponses
         var path = paths[0];
         var distance = (int)Math.Round(Number(path, "distance") ?? 0);
         var time = Number(path, "time") ?? 0;
-        var duration = time > 10_000 ? (int)Math.Round(time / 1000d) : (int)Math.Round(time);
+        var duration = (int)Math.Round(time / 1000d);
         if (!path.TryGetProperty("points", out var points) || !points.TryGetProperty("coordinates", out var coordinates))
             return null;
         var line = new List<double[]>();

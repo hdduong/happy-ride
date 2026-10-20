@@ -25,7 +25,8 @@ public sealed class RideService(
     IDriverRepository drivers,
     IDispatchBus dispatchBus,
     IUnitOfWork unitOfWork,
-    IRideWriteLock writeLock) : IRideService
+    IRideWriteLock writeLock,
+    ILogger<RideService> logger) : IRideService
 {
     public async Task<RideOutcome> CreateAsync(Guid riderId, Guid quoteId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
@@ -57,8 +58,15 @@ public sealed class RideService(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var result = new RideOutcome.Created(new CreatedRideDto(ride.Id));
-        var dispatched = await dispatchBus.PublishAsync(new DispatchMessage.Requested(ride.Id, ride.Round), cancellationToken);
-        result.Events.AddRange(dispatched);
+        try
+        {
+            var dispatched = await dispatchBus.PublishAsync(new DispatchMessage.Requested(ride.Id, ride.Round), cancellationToken);
+            result.Events.AddRange(dispatched);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Ride {RideId} was saved but dispatch was not published", ride.Id);
+        }
         return result;
     }
 

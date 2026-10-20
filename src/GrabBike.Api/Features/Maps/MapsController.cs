@@ -1,12 +1,10 @@
-using GrabBike.Api.Features.Realtime;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
 
 namespace GrabBike.Api.Features.Maps;
 
 [ApiController]
 [Route("api")]
-public sealed class MapsController(IMapService maps, IMapProviderResolver providers, IHubContext<RideHub> hub) : ControllerBase
+public sealed class MapsController(IMapService maps, IMapProviderResolver providers, IMapConfigPublisher publisher) : ControllerBase
 {
     [HttpGet("map-config")]
     public IActionResult Config() => Ok(maps.Configuration);
@@ -51,7 +49,7 @@ public sealed class MapsController(IMapService maps, IMapProviderResolver provid
         var error = providers.TrySelect(body.Provider);
         if (error is not null)
             return Conflict(new { error });
-        await hub.Clients.All.SendAsync("MapConfigChanged", maps.Configuration, cancellationToken);
+        await publisher.ChangedAsync(maps.Configuration, cancellationToken);
         return Ok(maps.Configuration);
     }
 }

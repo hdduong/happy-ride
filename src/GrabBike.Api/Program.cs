@@ -117,8 +117,8 @@ builder.Services.AddSingleton<IRideWriteLock, RideWriteLock>();
 builder.Services.AddSingleton<IUserIdProvider, QueryUserIdProvider>();
 builder.Services.AddSingleton<IRideEventPublisher, SignalRRideEventPublisher>();
 builder.Services.AddSingleton<IRideNotifications, NotificationDelivery>();
+builder.Services.AddSingleton<IMapConfigPublisher, SignalRMapConfigPublisher>();
 builder.Services.AddHostedService<DriverSimulationWorker>();
-builder.Services.AddHostedService<DispatchExpiryWorker>();
 
 var app = builder.Build();
 

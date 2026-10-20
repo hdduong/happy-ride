@@ -9,12 +9,12 @@ public class MapProviderParsingTests
     public void VietMap_route_reads_motorcycle_coordinates()
     {
         const string json = """
-            {"paths":[{"distance":1300,"time":180000,"points":{"coordinates":[[106.7,10.77],[106.71,10.78]]}}]}
+            {"paths":[{"distance":1300,"time":9000,"points":{"coordinates":[[106.7,10.77],[106.71,10.78]]}}]}
             """;
         var route = VietMapResponses.Route(json);
         Assert.NotNull(route);
         Assert.Equal(1300, route.DistanceM);
-        Assert.Equal(180, route.DurationS);
+        Assert.Equal(9, route.DurationS);
         Assert.Equal(2, route.Geometry.Coordinates.Length);
     }
 
