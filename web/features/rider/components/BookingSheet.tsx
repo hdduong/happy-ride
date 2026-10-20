@@ -11,6 +11,8 @@ export function BookingSheet({ booking, driverLive }: { booking: RiderBooking; d
     query, results, searching, quote, destination, ride, error, busy, quoting,
     homeReady, home, cityError, choosePlace, book, onCancel, onConfirm,
     resetToSearch, changeQuery, changeDestination, retryCity,
+    editingPickup, pickupQuery, manualPickup, beginPickupEdit, changePickupQuery,
+    clearPickupQuery, useCurrentPickup, focusDropoff, choosePickup, pickup,
   } = booking;
   let sheet = !homeReady && cityError ? (
     <div className="stack">
@@ -24,7 +26,10 @@ export function BookingSheet({ booking, driverLive }: { booking: RiderBooking; d
     </div>
   ) : (
     <SearchSheet
-      pickupName={home.name}
+      currentName={home.name}
+      manualPickup={manualPickup}
+      editingPickup={editingPickup}
+      pickupQuery={pickupQuery}
       ready={homeReady}
       query={query}
       results={results}
@@ -32,7 +37,13 @@ export function BookingSheet({ booking, driverLive }: { booking: RiderBooking; d
       quoting={quoting}
       error={error}
       onQuery={changeQuery}
+      onEditPickup={beginPickupEdit}
+      onPickupQuery={changePickupQuery}
+      onClearPickup={clearPickupQuery}
+      onUseCurrent={useCurrentPickup}
+      onFocusDropoff={focusDropoff}
       onChoose={(place) => void choosePlace(place)}
+      onChoosePickup={(place) => void choosePickup(place)}
     />
   );
 
@@ -106,7 +117,7 @@ export function BookingSheet({ booking, driverLive }: { booking: RiderBooking; d
     sheet = (
       <div className="stack">
         <p className="route-line" translate="no">
-          {home.name} {"\u2192"} {destination.name}
+          {pickup.name} {"\u2192"} {destination.name}
         </p>
         <p className="muted">
           {formatKm(quote.distanceM)} {"\u00b7"} {formatMinutes(quote.durationS)}

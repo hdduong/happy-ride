@@ -13,6 +13,9 @@ import type { RideView } from "@/features/rides/types";
 
 export function useRiderBooking(userId: string) {
   const [query, setQuery] = useState("");
+  const [editingPickup, setEditingPickup] = useState(false);
+  const [pickupQuery, setPickupQuery] = useState("");
+  const [manualPickup, setManualPickup] = useState<Place | null>(null);
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -27,6 +30,8 @@ export function useRiderBooking(userId: string) {
   const searchSeq = useRef(0);
   const { ride, live, session } = useRideSession(userId, "rider");
   const allowSearch = !ride && homeReady;
+  const pickup = manualPickup ?? home;
+  const searchText = editingPickup ? pickupQuery : query;
 
   useEffect(() => {
     let cancel = false;
@@ -59,20 +64,23 @@ export function useRiderBooking(userId: string) {
     setQuote(null);
     setDestination(null);
     setQuoting(false);
+    setEditingPickup(false);
+    setPickupQuery("");
   }, [ride]);
 
   useEffect(() => {
     if (!allowSearch) return;
     const seq = ++searchSeq.current;
     setResults([]);
-    const text = query.trim();
+    const text = searchText.trim();
     if (!text) {
       setSearching(false);
       return;
     }
     setSearching(true);
+    const bias = editingPickup ? home : pickup;
     const handle = window.setTimeout(() => {
-      void autocomplete(userId, text, home.lat, home.lng)
+      void autocomplete(userId, text, bias.lat, bias.lng)
         .then((places) => {
           if (searchSeq.current === seq) setResults(places);
         })
@@ -86,11 +94,12 @@ export function useRiderBooking(userId: string) {
         });
     }, 300);
     return () => window.clearTimeout(handle);
-  }, [allowSearch, home.lat, home.lng, query, userId]);
+  }, [allowSearch, editingPickup, home.lat, home.lng, pickup.lat, pickup.lng, searchText, userId]);
 
   async function choosePlace(suggestion: Place) {
     if (!homeReady) return;
     const seq = ++searchSeq.current;
+    const origin = pickup;
     setError(null);
     setQuoting(true);
     setQuote(null);
@@ -99,7 +108,7 @@ export function useRiderBooking(userId: string) {
       if (searchSeq.current !== seq) return;
       const nextQuote = await createQuote(
         userId,
-        { lat: home.lat, lng: home.lng, address: home.name },
+        { lat: origin.lat, lng: origin.lng, address: origin.name },
         { lat: place.lat, lng: place.lng, address: place.name || place.address },
       );
       if (searchSeq.current !== seq) return;
@@ -132,7 +141,7 @@ export function useRiderBooking(userId: string) {
         const fallback: RideView = {
           rideId,
           status: "Searching",
-          pickup: { lat: home.lat, lng: home.lng, address: home.name },
+          pickup: { lat: pickup.lat, lng: pickup.lng, address: pickup.name },
           round: 1,
           dropoff: {
             lat: currentDestination.lat,
@@ -196,6 +205,73 @@ export function useRiderBooking(userId: string) {
     setQuery("");
     setResults([]);
     setError(null);
+    setManualPickup(null);
+    setEditingPickup(false);
+    setPickupQuery("");
+  }
+
+  function beginPickupEdit() {
+    if (!homeReady || quoting) return;
+    searchSeq.current += 1;
+    setEditingPickup(true);
+    setPickupQuery(manualPickup?.name ?? "");
+    setResults([]);
+    setError(null);
+    setSearching((manualPickup?.name ?? "").trim().length > 0);
+  }
+
+  function changePickupQuery(value: string) {
+    searchSeq.current += 1;
+    setPickupQuery(value);
+    setError(null);
+    setSearching(value.trim().length > 0);
+  }
+
+  function clearPickupQuery() {
+    searchSeq.current += 1;
+    setPickupQuery("");
+    setResults([]);
+    setSearching(false);
+    setError(null);
+  }
+
+  function useCurrentPickup() {
+    searchSeq.current += 1;
+    setManualPickup(null);
+    setEditingPickup(false);
+    setPickupQuery("");
+    setResults([]);
+    setSearching(false);
+    setQuote(null);
+    setDestination(null);
+    setError(null);
+  }
+
+  function focusDropoff() {
+    if (!editingPickup) return;
+    searchSeq.current += 1;
+    setEditingPickup(false);
+    setPickupQuery("");
+    setResults([]);
+    setSearching(query.trim().length > 0);
+  }
+
+  async function choosePickup(suggestion: Place) {
+    if (!homeReady) return;
+    const seq = ++searchSeq.current;
+    setError(null);
+    try {
+      const place = await getPlace(userId, suggestion.id);
+      if (searchSeq.current !== seq) return;
+      setManualPickup(place);
+      setEditingPickup(false);
+      setPickupQuery("");
+      setResults([]);
+      setQuote(null);
+      setDestination(null);
+    } catch (reason: unknown) {
+      if (searchSeq.current === seq) setError(messageFrom(reason));
+    }
   }
 
   function changeQuery(value: string) {
@@ -219,8 +295,10 @@ export function useRiderBooking(userId: string) {
 
   return {
     query, results, searching, quote, destination, ride, live, error, busy,
-    quoting, homeReady, home, cityError, choosePlace, book, onCancel,
-    onConfirm, resetToSearch, changeQuery, changeDestination, retryCity,
+    quoting, homeReady, home, pickup, cityError, editingPickup, pickupQuery,
+    manualPickup, choosePlace, choosePickup, book, onCancel, onConfirm,
+    resetToSearch, changeQuery, changePickupQuery, clearPickupQuery,
+    beginPickupEdit, useCurrentPickup, focusDropoff, changeDestination, retryCity,
   };
 }
 
