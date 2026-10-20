@@ -2,11 +2,11 @@ import { bearing, isPlotted, linePoints } from "@/features/maps/geo";
 import type { MapMarker } from "@/features/maps/MapCanvas";
 import type { RiderBooking } from "./useRiderBooking";
 
-export function riderMap({ ride, live, home, destination, quote }: Pick<RiderBooking, "ride" | "live" | "home" | "destination" | "quote">) {
+export function riderMap({ ride, live, pickup: selected, destination, quote }: Pick<RiderBooking, "ride" | "live" | "pickup" | "destination" | "quote">) {
   const pickup = ride?.pickup ?? {
-    lat: home.lat,
-    lng: home.lng,
-    address: home.name,
+    lat: selected.lat,
+    lng: selected.lng,
+    address: selected.name,
   };
   const dropoff =
     ride?.dropoff ??
