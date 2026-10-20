@@ -11,12 +11,35 @@ using GrabBike.Api.Infrastructure.Persistence.Repositories;
 using GrabBike.Api.SharedKernel;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Happy Ride API",
+        Version = "v1",
+        Description = "Seeded rider An Nguyen: 11111111-1111-1111-1111-111111111111. Driver Khoa Pham: 33333333-3333-3333-3333-333333333333. Send the id in the X-User-Id header.",
+    });
+    options.AddSecurityDefinition("X-User-Id", new OpenApiSecurityScheme
+    {
+        Name = "X-User-Id",
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Header,
+        Description = "Persona id from GET /api/dev/users.",
+    });
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("X-User-Id", document)] = [],
+    });
 });
 
 string[] allowedOrigins = builder.Configuration["Cors:AllowedOrigins"]
@@ -56,7 +79,7 @@ builder.Services.AddScoped<IQuoteRepository, QuoteRepository>();
 builder.Services.AddScoped<IRideRepository, RideRepository>();
 builder.Services.AddScoped<IOfferRepository, OfferRepository>();
 
-builder.Services.AddScoped<IDevService, DevService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IMapProvider, FakeMapProvider>();
 builder.Services.AddScoped<IMapService, MapService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
@@ -79,6 +102,19 @@ await using (var scope = app.Services.CreateAsyncScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
     await DatabaseSeeder.SeedAsync(db);
+}
+
+if (app.Environment.IsDevelopment())
+{
+    // One Swashbuckle document, generated from the controllers. Swagger UI and Scalar both render it.
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json");
+    });
+    app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
+    app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
 }
 
 app.UseCors();

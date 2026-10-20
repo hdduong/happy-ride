@@ -2,14 +2,14 @@ using GrabBike.Api.Features.Drivers;
 
 namespace GrabBike.Api.Features.Dev;
 
-public interface IDevService
+public interface IUserService
 {
-    Task<IReadOnlyList<DevUserDto>> ListUsersAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DevUserDto>> ListAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed class DevService(IUserRepository users, IDriverRepository drivers) : IDevService
+public sealed class UserService(IUserRepository users, IDriverRepository drivers) : IUserService
 {
-    public async Task<IReadOnlyList<DevUserDto>> ListUsersAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DevUserDto>> ListAsync(CancellationToken cancellationToken = default)
     {
         var people = await users.ListAsync(cancellationToken);
         var fleet = await drivers.ListAsync(cancellationToken);
