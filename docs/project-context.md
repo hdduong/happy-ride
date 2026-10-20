@@ -1,6 +1,6 @@
 # Project context — GrabBike clone capstone
 
-Stable goals, constraints, and decisions. Progress lives in `notes.md`; the build plan in `build-plan.md`; the original analysis in `capstone-scope-proposal.md`; the source brief is `vietnam-bike-rideshare-design.pdf`.
+Stable goals, constraints, and decisions. Progress lives in `notes.md`; the build plan in `build-plan.md`; the source brief is `vietnam-bike-rideshare-design.pdf`.
 
 ## Goal
 

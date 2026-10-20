@@ -1,6 +1,6 @@
 # GrabBike Clone — 3-Day Build Plan
 
-Spec for coding agents. Decisions come from `project-context.md` (overrides `capstone-scope-proposal.md`); the brief is `vietnam-bike-rideshare-design.pdf`. One engineer (Hien) plus agents, 3 days from 20 Oct 2026. Only the five-step core flow must work; everything in section 6's non-goals is off the table.
+Spec for coding agents. Decisions come from `project-context.md`; the brief is `vietnam-bike-rideshare-design.pdf`. One engineer (Hien) plus agents, 3 days from 20 Oct 2026. Only the five-step core flow must work; everything in section 6's non-goals is off the table.
 
 ## 1. Architecture
 
