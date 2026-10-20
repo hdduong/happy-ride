@@ -1,8 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GrabBike.Api.Features.Dispatch;
+using GrabBike.Api.Features.Realtime;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GrabBike.Api.Tests;
 
@@ -252,6 +256,74 @@ public class RideFlowTests
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), rideId));
     }
 
+    [Fact]
+    public async Task Failed_notifications_do_not_turn_a_committed_create_into_an_HTTP_failure()
+    {
+        var publisher = new FailingPublisher();
+        await using var fixture = new ApiFactory(publisher);
+
+        var rideId = await CreateRide(fixture.Client(An));
+
+        Assert.True(publisher.Attempts > 0);
+        var current = await Read(await fixture.Client(An).GetAsync("/api/rides/current"), HttpStatusCode.OK);
+        Assert.Equal(rideId, current.GetProperty("rideId").GetGuid());
+        Assert.Equal("Searching", current.GetProperty("status").GetString());
+        Assert.NotEqual(Guid.Empty, await PendingOffer(fixture.Client(Khoa), rideId));
+    }
+
+    [Fact]
+    public async Task Failed_notifications_do_not_turn_a_committed_accept_into_an_HTTP_failure()
+    {
+        var publisher = new FailingPublisher();
+        await using var fixture = new ApiFactory(publisher);
+        var rideId = await CreateRide(fixture.Client(An));
+        var offerId = await PendingOffer(fixture.Client(Khoa), rideId);
+        var attemptsBeforeAccept = publisher.Attempts;
+
+        var accepted = await Read(
+            await fixture.Client(Khoa).PostAsync($"/api/offers/{offerId}/accept", content: null),
+            HttpStatusCode.OK);
+
+        Assert.Equal("Accepted", accepted.GetProperty("status").GetString());
+        Assert.True(publisher.Attempts > attemptsBeforeAccept);
+        var current = await Read(await fixture.Client(Khoa).GetAsync("/api/rides/current"), HttpStatusCode.OK);
+        Assert.Equal(rideId, current.GetProperty("rideId").GetGuid());
+        Assert.Equal("Accepted", current.GetProperty("status").GetString());
+        Assert.Equal(Guid.Parse(Khoa), current.GetProperty("driver").GetProperty("userId").GetGuid());
+        Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Linh), rideId));
+    }
+
+    [Fact]
+    public async Task Dispatch_expiry_advances_rounds_without_running_driver_simulation()
+    {
+        await using var fixture = new ApiFactory();
+        var rideId = await CreateRide(fixture.Client(An));
+        var firstExpiry = DateTimeOffset.UtcNow.AddSeconds(31);
+
+        // Separate scopes model the independently scheduled dispatch job.
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var expiry = scope.ServiceProvider.GetRequiredService<IDispatchExpiryService>();
+            var events = await expiry.AdvanceAsync(firstExpiry);
+            Assert.Equal(3, events.OfType<OutboundEvent.OfferClosed>().Count());
+        }
+
+        var roundTwo = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("Searching", roundTwo.GetProperty("status").GetString());
+        Assert.Equal(2, roundTwo.GetProperty("round").GetInt32());
+        Assert.NotEqual(Guid.Empty, await PendingOffer(fixture.Client(Ha), rideId));
+        Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), rideId));
+
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var expiry = scope.ServiceProvider.GetRequiredService<IDispatchExpiryService>();
+            await expiry.AdvanceAsync(firstExpiry.AddSeconds(31));
+        }
+
+        var exhausted = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("NoDriver", exhausted.GetProperty("status").GetString());
+    }
+
     private static async Task<Guid> CreateRide(HttpClient rider)
     {
         var quote = await Read(await rider.PostAsJsonAsync("/api/quotes", new
@@ -312,7 +384,19 @@ public class RideFlowTests
 
     private sealed record Pin(double Lat, double Lng, string Address);
 
-    private sealed class ApiFactory : WebApplicationFactory<Program>
+    private sealed class FailingPublisher : IRideEventPublisher
+    {
+        private int _attempts;
+        public int Attempts => Volatile.Read(ref _attempts);
+
+        public Task PublishAsync(IReadOnlyList<OutboundEvent> events, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _attempts);
+            throw new InvalidOperationException("Simulated SignalR outage");
+        }
+    }
+
+    private sealed class ApiFactory(IRideEventPublisher? publisher = null) : WebApplicationFactory<Program>
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"happy-ride-{Guid.NewGuid():N}.db");
 
@@ -326,6 +410,14 @@ public class RideFlowTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("ConnectionStrings:GrabBike", $"Data Source={_databasePath}");
+            if (publisher is not null)
+            {
+                builder.ConfigureServices(services =>
+                {
+                    services.RemoveAll<IRideEventPublisher>();
+                    services.AddSingleton(publisher);
+                });
+            }
         }
 
         protected override void Dispose(bool disposing)
