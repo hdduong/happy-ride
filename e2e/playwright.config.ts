@@ -29,7 +29,13 @@ export default defineConfig({
     {
       command: `dotnet run --project ../src/GrabBike.Api --no-launch-profile --urls ${apiUrl}`,
       url: `${apiUrl}/api/map-config`,
-      env: { Cors__AllowedOrigins: webUrl },
+      env: {
+        Cors__AllowedOrigins: webUrl,
+        ConnectionStrings__GrabBike: process.env.ConnectionStrings__GrabBike
+          ?? 'Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride',
+        'Dispatch__Bus': 'InMemory',
+        'Maps__Provider': 'Fake',
+      },
       name: 'api',
       reuseExistingServer: reuseDevServers,
       timeout: 300000,

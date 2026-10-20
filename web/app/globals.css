@@ -133,10 +133,47 @@ h1 {
   background: var(--map);
 }
 
-.map-canvas svg {
+.map-canvas svg,
+.map-canvas .maplibregl-map,
+.map-canvas > div {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.map-pickup,
+.map-dropoff,
+.map-bike,
+.map-pulse {
+  border-radius: 50%;
+}
+
+.map-pickup,
+.map-bike {
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border: 3px solid #000;
+}
+
+.map-dropoff {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.map-pulse {
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  animation: map-pulse 1.8s ease-out infinite;
+}
+
+@keyframes map-pulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(3.2); opacity: 0; }
 }
 
 .banner-layer {

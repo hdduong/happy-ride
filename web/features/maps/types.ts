@@ -3,6 +3,11 @@ export type LatLng = {
   lng: number;
 };
 
+export type MapMarker = LatLng & {
+  kind: "pickup" | "dropoff" | "bike";
+  heading?: number;
+};
+
 export type PlacePoint = LatLng & {
   address: string;
 };

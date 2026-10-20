@@ -92,6 +92,47 @@ jobs:
       - name: Prepare App Service
         run: bash .github/scripts/deploy-azure.sh
 
+      - name: Deploy Postgres and Service Bus
+        env:
+          POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+          VIETMAP_API_KEY: ${{ secrets.VIETMAP_API_KEY }}
+          VIETMAP_TILEMAP_KEY: ${{ secrets.VIETMAP_TILEMAP_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          GOOGLE_MAPS_BROWSER_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
+        run: |
+          if [ -z "$POSTGRES_ADMIN_PASSWORD" ]; then
+            echo "POSTGRES_ADMIN_PASSWORD is not set. Skipping Bicep. Add it before the API can use Azure Postgres."
+            exit 0
+          fi
+          az deployment group create \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name grabbike \
+            --template-file infra/main.bicep \
+            --parameters postgresAdminPassword="$POSTGRES_ADMIN_PASSWORD" \
+            --query properties.outputs \
+            --output json > infra-outputs.json
+          host="$(python3 -c 'import json; print(json.load(open("infra-outputs.json"))["postgresHost"]["value"])')"
+          bus="$(python3 -c 'import json; print(json.load(open("infra-outputs.json"))["serviceBusConnectionString"]["value"])')"
+          provider="Fake"
+          if [ -n "$VIETMAP_API_KEY" ] && [ -n "$VIETMAP_TILEMAP_KEY" ]; then
+            provider="VietMap"
+          fi
+          az webapp config appsettings set \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name "${AZURE_API_APP:-app-grabbike-api}" \
+            --settings \
+              ConnectionStrings__GrabBike="Host=${host};Database=happyride;Username=happyride;Password=${POSTGRES_ADMIN_PASSWORD};SSL Mode=Require" \
+              Dispatch__Bus="ServiceBus" \
+              ServiceBus__ConnectionString="$bus" \
+              ServiceBus__Queue="dispatch" \
+              Maps__Provider="$provider" \
+              Maps__VietMap__ApiKey="$VIETMAP_API_KEY" \
+              Maps__VietMap__TileKey="$VIETMAP_TILEMAP_KEY" \
+              Maps__Google__ApiKey="$GOOGLE_MAPS_API_KEY" \
+              Maps__Google__BrowserKey="$GOOGLE_MAPS_BROWSER_KEY" \
+              Sim__Enabled="true"
+          rm -f infra-outputs.json
+
       - name: Deploy the API
         uses: azure/webapps-deploy@v3
         with:

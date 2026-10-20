@@ -23,7 +23,8 @@ Delegate to `planner` before a multi-step change, to `implementer` for the code,
 - Do not commit secrets. `.env` files, keys, and credential files stay untracked.
 - Work on a branch and open a pull request. Leave `main` as the integration branch.
 - API and web commands:
-  - API: `dotnet run --project src/GrabBike.Api --launch-profile http` (http://localhost:5080). Reference docs: http://localhost:5080/scalar/v1 and http://localhost:5080/swagger. `/` and `/scalar` redirect to Scalar. Both UIs read the OpenAPI document generated from the controllers.
+  - Database: `docker compose up -d` starts local PostGIS. The API connection string is `Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride`.
+  - API: `dotnet run --project src/GrabBike.Api --launch-profile http` (http://localhost:5080). Reference docs: http://localhost:5080/scalar/v1 and http://localhost:5080/swagger. `/` and `/scalar` redirect to Scalar. Both UIs read the OpenAPI document generated from the controllers. Map search stays on the API. The browser only receives the public tile style or Google browser key from `GET /api/map-config`. `Maps:Provider` is `Fake` unless VietMap or Google keys are set.
   - Web: `npm install` then `npm run dev` in `web/` (http://localhost:3000)
   - API tests: `dotnet test`
   - Frontend state and connection tests: `npm test` in `web/`

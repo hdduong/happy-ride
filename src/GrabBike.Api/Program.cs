@@ -11,8 +11,10 @@ using GrabBike.Api.Infrastructure.Persistence.Repositories;
 using GrabBike.Api.SharedKernel;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using Azure.Messaging.ServiceBus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -69,7 +71,10 @@ builder.Services.AddSignalR().AddJsonProtocol(options =>
 
 var connectionString = builder.Configuration.GetConnectionString("GrabBike")
     ?? throw new InvalidOperationException("ConnectionStrings:GrabBike is required.");
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString, npgsql => npgsql.UseNetTopologySuite()));
+builder.Services.Configure<MapOptions>(builder.Configuration.GetSection("Maps"));
+builder.Services.AddSingleton<MapProviderOverride>();
 builder.Services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -80,7 +85,12 @@ builder.Services.AddScoped<IRideRepository, RideRepository>();
 builder.Services.AddScoped<IOfferRepository, OfferRepository>();
 
 builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IMapProvider, FakeMapProvider>();
+builder.Services.AddHttpClient<VietMapMapProvider>(client => client.Timeout = TimeSpan.FromSeconds(5));
+builder.Services.AddHttpClient<GoogleMapProvider>(client => client.Timeout = TimeSpan.FromSeconds(5));
+builder.Services.AddScoped<FakeMapProvider>();
+builder.Services.AddScoped<MapProviderResolver>();
+builder.Services.AddScoped<IMapProvider>(provider => provider.GetRequiredService<MapProviderResolver>());
+builder.Services.AddScoped<IMapProviderResolver>(provider => provider.GetRequiredService<MapProviderResolver>());
 builder.Services.AddScoped<IMapService, MapService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
 builder.Services.AddScoped<IRideService, RideService>();
@@ -88,6 +98,21 @@ builder.Services.AddScoped<IOfferService, OfferService>();
 
 builder.Services.AddScoped<IDriverSimulationService, DriverSimulationService>();
 builder.Services.AddScoped<IDispatchExpiryService, DispatchExpiryService>();
+builder.Services.AddScoped<IDispatchMessageHandler, DispatchMessageHandler>();
+var serviceBusConnection = builder.Configuration["ServiceBus:ConnectionString"];
+var useServiceBus = string.Equals(builder.Configuration["Dispatch:Bus"], "ServiceBus", StringComparison.OrdinalIgnoreCase)
+    && !string.IsNullOrWhiteSpace(serviceBusConnection);
+if (useServiceBus)
+{
+    builder.Services.AddSingleton(new ServiceBusClient(serviceBusConnection));
+    builder.Services.AddSingleton<IDispatchBus, ServiceBusDispatchBus>();
+    builder.Services.AddHostedService<ServiceBusDispatchWorker>();
+}
+else
+{
+    builder.Services.AddSingleton<IDispatchBus, InMemoryDispatchBus>();
+    builder.Services.AddHostedService<DispatchExpiryWorker>();
+}
 builder.Services.AddSingleton<IRideWriteLock, RideWriteLock>();
 builder.Services.AddSingleton<IUserIdProvider, QueryUserIdProvider>();
 builder.Services.AddSingleton<IRideEventPublisher, SignalRRideEventPublisher>();
@@ -100,6 +125,12 @@ var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await using (var connection = new NpgsqlConnection(connectionString))
+    {
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("CREATE EXTENSION IF NOT EXISTS postgis", connection);
+        await command.ExecuteNonQueryAsync();
+    }
     await db.Database.EnsureCreatedAsync();
     await DatabaseSeeder.SeedAsync(db);
 }
