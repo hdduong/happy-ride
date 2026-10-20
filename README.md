@@ -1,8 +1,21 @@
 # happy-ride
 
-Private repository for coordinated work by a team of Cursor agents.
+[![Build](https://github.com/hdduong/happy-ride/actions/workflows/build.yml/badge.svg)](https://github.com/hdduong/happy-ride/actions/workflows/build.yml)
+[![CI](https://github.com/hdduong/happy-ride/actions/workflows/ci.yml/badge.svg)](https://github.com/hdduong/happy-ride/actions/workflows/ci.yml)
+[![Deployment](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml/badge.svg)](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml)
+[![version](https://img.shields.io/badge/version-not_deployed-lightgrey?style=flat-square)](https://github.com/hdduong/happy-ride/releases)
+
+A merge into `main` runs **Build** and **CI**. Build compiles the API and the web app. CI runs the API tests and the browser ride test. When both are green, CI opens a deployment request. Azure changes only after you open [Deployment](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml), click **Run workflow**, check **Deploy to Azure production**, and click the green **Run workflow** button.
+
+That button creates or updates one Linux B1 App Service plan, `plan-grabbike`, in `rg-grabbike-dev` (about $13 per month, shared by the API and the web). A successful deploy tags `v1.0.<commit count>` and updates the version badge.
+
+Motorbike ride demo with an ASP.NET Core API and Next.js rider and driver screens. The current demo uses SQLite, seeded users, simulated driver movement, and fake places/routes.
 
 - [`AGENTS.md`](AGENTS.md) — how the team works in this repo
 - [`.cursor/agents/`](.cursor/agents/) — planner, implementer, verifier, and reviewer
+- [`docs/architecture.md`](docs/architecture.md) — feature ownership, dependency rules, and current implementation limits
+- [`docs/build-plan.md`](docs/build-plan.md) — target MVP architecture and remaining integrations
 
-Invoke a specialist with `/planner`, `/implementer`, `/verifier`, or `/reviewer`. Product code is not part of this initial commit.
+Run the API with `dotnet run --project src/GrabBike.Api --launch-profile http`. In `web/`, run `npm ci` and `npm run dev`. Open the user picker at `http://localhost:3000`, or use the seeded rider and driver links in `AGENTS.md`.
+
+Validate with `dotnet test happy-ride.sln --configuration Release`, then `npm test` and `npm run build` in `web/`. For the two-browser ride test, run `npm ci`, `npx playwright install chromium`, and `npm test` in `e2e/`.

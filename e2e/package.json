@@ -1,0 +1,11 @@
+{
+  "name": "happy-ride-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ride": "playwright test tests/ride.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  }
+}

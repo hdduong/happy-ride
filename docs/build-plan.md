@@ -4,6 +4,8 @@ Spec for coding agents. Decisions come from `project-context.md`; the brief is `
 
 ## 1. Architecture
 
+The current demo's feature boundaries and implementation limits are documented in [architecture.md](architecture.md). The services and integrations below describe the target MVP.
+
 ### 1.1 Solution layout (one repo)
 
 ```
@@ -20,8 +22,13 @@ src/GrabBike.Api/              # single ASP.NET Core (.NET 10) project, vertical
 tests/GrabBike.Api.Tests/      # xUnit + Testcontainers (Postgres)
 web/                           # Next.js App Router, output: 'export'
   app/page.tsx (user picker)  app/rider/  app/driver/  app/sim/
-  components/map/MapView.tsx, MapLibreCanvas.tsx (VietMap + Fake), GoogleCanvas.tsx
-  lib/api.ts, lib/signalr.ts, lib/user.ts
+  features/rider/       booking hook and rider components
+  features/driver/      dashboard hook and driver components
+  features/rides/       shared ride session, polling, realtime, contracts
+  features/maps/        map components, geometry, places and quotes
+  features/identity/    demo user picker and route guard
+  shared/api/           common HTTP transport
+  shared/ui/            reusable presentation components
 docker-compose.yml             # postgis/postgis:16 for local dev
 ```
 
@@ -77,8 +84,9 @@ Total ≈ $31/month. No Redis, no Key Vault, no VNet, no custom domains.
 ### 1.6 CI/CD, infrastructure as code, secrets
 
 - **IaC: Bicep via `az deployment group create`**, not azd: it fits the `AZURE_CREDENTIALS` + `azure/login` flow exactly, every step is a standard, independently debuggable action, and there is no azd environment state to manage in CI. `infra/main.bicep` is idempotent: Plan, Web App (+ app settings), SWA, Postgres (+ database, firewall rule, `azure.extensions`), Service Bus (namespace, queue, auth rule), Log Analytics, App Insights.
-- **`ci.yml`** on `pull_request`: `dotnet build` + `dotnet test` (Testcontainers; runners have Docker), `npm ci && npm run lint && npm run build` in `web/`. No secrets; provider contract tests use recorded JSON.
-- **`deploy.yml`** on push to `main` (+ `workflow_dispatch`, `concurrency: deploy`): `azure/login@v2` (`creds: AZURE_CREDENTIALS`) → Bicep deploy with `@secure()` parameters → `dotnet publish` → `azure/webapps-deploy@v3` → `next build` with `NEXT_PUBLIC_API_BASE_URL=https://app-grabbike-api.azurewebsites.net` → `az staticwebapp secrets list --query properties.apiKey` → `Azure/static-web-apps-deploy@v1` (`skip_app_build: true`, `app_location: web/out`).
+- **`build.yml`** (workflow name `Build`) on `pull_request` and on push to `main`: `dotnet build` and `npm run build` in `web/`.
+- **`ci.yml`** (workflow name `CI`) on `pull_request` and on push to `main`: `dotnet test` and `npx playwright test` in `e2e/` (the browser test starts the API and the web app). No secrets. When both this workflow and Build are green on `main`, CI opens a production deployment request.
+- **`deploy.yml`** (workflow name `Deployment`) is `workflow_dispatch` only. A human checks **Deploy to Azure production** and clicks **Run workflow**. That is the deployment button. The job then checks that Build and CI passed for `main`, logs in with `AZURE_CREDENTIALS`, and deploys the API and web to App Service in `rg-grabbike-dev`. It tags `v1.0.<commit-count>` after a successful deploy.
 - **GitHub Actions secrets (exact names):** `AZURE_CREDENTIALS`, `VIETMAP_API_KEY`, `VIETMAP_TILEMAP_KEY`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_MAPS_BROWSER_KEY`, plus the sixth, `POSTGRES_ADMIN_PASSWORD` (password auth, not Entra passwordless).
 - **Where keys go.** All four map keys are Bicep `@secure()` parameters written as **Web App app settings**: `Maps__VietMap__ApiKey`, `Maps__VietMap__TileKey`, `Maps__Google__ApiKey`, `Maps__Google__BrowserKey`; alongside `Maps__Provider=VietMap`, `ConnectionStrings__Default` (built in Bicep from the server FQDN + password), `ServiceBus__ConnectionString` (Bicep `listKeys()` on the namespace auth rule — never in GitHub), `APPLICATIONINSIGHTS_CONNECTION_STRING`, `Cors__AllowedOrigins`, `Dev__Enabled=true`, `Sim__Enabled=true` (Bicep parameter `simEnabled`, default `true`; the simulator is the demo path). The Static Web App holds **no secrets**; its only build-time variable is the API URL.
 - **Frontend key rule.** Only the two public keys ever reach the browser, and only via `GET /api/map-config`, which returns the active provider's config: VietMap → a style URL containing `VIETMAP_TILEMAP_KEY`; Google → `GOOGLE_MAPS_BROWSER_KEY`. `VIETMAP_API_KEY` and `GOOGLE_MAPS_API_KEY` are server-only; all autocomplete, place details, reverse geocoding and routing go through the API. Restrictions: `GOOGLE_MAPS_BROWSER_KEY` → HTTP referrers `https://<swa-host>/*` and `http://localhost:3000/*`, API restriction Maps JavaScript API only; `GOOGLE_MAPS_API_KEY` → Routes API, Places API (New), Geocoding API only; `VIETMAP_TILEMAP_KEY` → domain restriction if VietMap's console offers it. Never put a key in `NEXT_PUBLIC_*`.

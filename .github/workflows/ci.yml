@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Test the API
+        run: dotnet test happy-ride.sln --configuration Release
+
+  ui:
+    name: UI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Test frontend state and connection lifecycle
+        working-directory: web
+        run: npm test
+
+      - name: Install browser tests
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Test the ride flow
+        working-directory: e2e
+        run: npm test
+
+  request-deploy:
+    name: Request production deployment
+    needs: [backend, ui]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version this commit
+        id: meta
+        run: |
+          echo "version=v1.0.$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the Build workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.meta.outputs.sha }}
+        run: |
+          if ! bash .github/scripts/require-green.sh "$SHA" build.yml 60; then
+            echo "Build did not pass, so no production deployment was requested."
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_ENV"
+
+      - name: Open the deployment request
+        if: env.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHA: ${{ steps.meta.outputs.sha }}
+          REPO: ${{ github.repository }}
+        run: bash .github/scripts/open-deploy-request.sh
