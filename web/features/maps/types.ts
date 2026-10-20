@@ -25,6 +25,14 @@ export type GeoLine = {
   coordinates: number[][];
 };
 
+export type MapClientConfig = {
+  provider: string;
+  styleUrl: string | null;
+  browserKey: string | null;
+  region: string;
+  language: string;
+};
+
 export type Quote = {
   quoteId: string;
   provider: string;

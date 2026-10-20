@@ -1,6 +1,13 @@
 import { request } from "@/shared/api/client";
-import { asPlace, asQuote } from "./parse";
-import type { Place, PlacePoint, Quote } from "./types";
+import { asMapConfig, asPlace, asQuote } from "./parse";
+import type { MapClientConfig, Place, PlacePoint, Quote } from "./types";
+
+export async function getMapConfig(): Promise<MapClientConfig> {
+  const payload = await request<unknown>("/api/map-config");
+  const config = asMapConfig(payload);
+  if (!config) throw new Error("Map config was incomplete");
+  return config;
+}
 
 export function autocomplete(userId: string, query: string, lat: number, lng: number): Promise<Place[]> {
   const params = new URLSearchParams({

@@ -19,6 +19,18 @@ public class MapProviderParsingTests
     }
 
     [Fact]
+    public void VietMap_place_without_a_name_uses_the_address_parts()
+    {
+        const string json = """
+            {"lat":10.77,"lng":106.7,"hs_num":"2","street":"Hai Trieu","ward":"Ben Nghe","district":"1","city":"Ho Chi Minh"}
+            """;
+        var place = VietMapResponses.Place(json, "ref-1");
+        Assert.NotNull(place);
+        Assert.Equal("2, Hai Trieu, Ben Nghe, 1, Ho Chi Minh", place.Name);
+        Assert.Equal(10.77, place.Lat);
+    }
+
+    [Fact]
     public void Google_route_reads_geojson_duration()
     {
         const string json = """

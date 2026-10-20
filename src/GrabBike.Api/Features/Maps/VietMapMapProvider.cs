@@ -86,7 +86,7 @@ public static class VietMapResponses
         var row = document.RootElement;
         var lat = Number(row, "lat");
         var lng = Number(row, "lng");
-        var name = Text(row, "name") ?? Text(row, "display");
+        var name = PlaceLabel(row);
         if (lat is null || lng is null || name is null)
             return null;
         return new PlaceDto(id, name, Text(row, "address") ?? name, lat.Value, lng.Value);
@@ -120,6 +120,17 @@ public static class VietMapResponses
             line.Add([pair[0].GetDouble(), pair[1].GetDouble()]);
         }
         return new MapRoute(distance, duration, new GeoRoute("LineString", line.ToArray()));
+    }
+
+    private static string? PlaceLabel(JsonElement row)
+    {
+        var named = Text(row, "name") ?? Text(row, "display") ?? Text(row, "address");
+        if (!string.IsNullOrWhiteSpace(named))
+            return named;
+        var parts = new[] { Text(row, "hs_num"), Text(row, "street"), Text(row, "ward"), Text(row, "district"), Text(row, "city") }
+            .Where(part => !string.IsNullOrWhiteSpace(part));
+        var label = string.Join(", ", parts);
+        return string.IsNullOrWhiteSpace(label) ? null : label;
     }
 
     private static string? Text(JsonElement row, string name) =>

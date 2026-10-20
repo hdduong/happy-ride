@@ -2,19 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
-import { apiBase } from "@/shared/api/client";
+import { getMapConfig } from "./api";
 import { GoogleDarkMap } from "./GoogleDarkMap";
-import type { LatLng, MapMarker } from "./types";
+import type { LatLng, MapClientConfig, MapMarker } from "./types";
 
 export type { MapMarker };
-
-type MapConfig = {
-  provider: string;
-  styleUrl: string | null;
-  browserKey: string | null;
-  region: string;
-  language: string;
-};
 
 const darkStyle = "https://tiles.openfreemap.org/styles/dark";
 
@@ -29,14 +21,13 @@ export function MapCanvas({
   markers?: MapMarker[];
   pulse?: LatLng | null;
 }) {
-  const [config, setConfig] = useState<MapConfig | null>(null);
+  const [config, setConfig] = useState<MapClientConfig | null>(null);
 
   useEffect(() => {
     let cancel = false;
     const load = () => {
-      void fetch(`${apiBase()}/api/map-config`)
-        .then((response) => response.json())
-        .then((payload: MapConfig) => {
+      void getMapConfig()
+        .then((payload) => {
           if (!cancel) setConfig(payload);
         })
         .catch(() => {
@@ -136,14 +127,16 @@ function LibreDarkMap({
     if (!map?.getSource("route")) return;
     const source = map.getSource("route") as GeoJSONSource | undefined;
     source?.setData(lineData(route));
-    const points = route.length > 0 ? route : [center, ...markers];
+    const points = [...route, ...markers];
+    if (pulse) points.push(pulse);
+    if (points.length === 0) points.push(center);
     if (points.length === 0) return;
     void import("maplibre-gl").then((module) => {
       const bounds = new module.LngLatBounds();
       for (const point of points) bounds.extend([point.lng, point.lat]);
       map.fitBounds(bounds, { padding: { top: 80, bottom: 280, left: 48, right: 48 }, maxZoom: 16, duration: 0 });
     });
-  }, [map, route, center, markers]);
+  }, [map, route, center, markers, pulse]);
 
   useEffect(() => {
     if (!map) return;

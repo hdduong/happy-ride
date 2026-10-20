@@ -78,8 +78,10 @@ function GoogleOverlays({
         })
       : null;
     const bounds = new maps.LatLngBounds();
-    const points = route.length > 0 ? route : [center, ...markers];
-    for (const point of pulse ? [...points, pulse] : points) bounds.extend(point);
+    const points = [...route, ...markers];
+    if (pulse) points.push(pulse);
+    if (points.length === 0) points.push(center);
+    for (const point of points) bounds.extend(point);
     if (!bounds.isEmpty()) map.fitBounds(bounds, 80);
     return () => {
       for (const marker of drawn) marker.setMap(null);
