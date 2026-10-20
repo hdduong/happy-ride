@@ -5,6 +5,7 @@ public sealed class RideStore
     private const double DispatchRadiusM = 3000;
     private const int OfferTtlSeconds = 30;
     private const int MaxOffers = 3;
+    private const int MaxRounds = 3;
 
     private readonly object _gate = new();
     private readonly List<User> _users = [];
@@ -143,47 +144,10 @@ public sealed class RideStore
             };
             _rides.Add(ride);
 
-            var ranked = new List<(Driver Driver, double Distance)>();
-            foreach (var driver in _drivers)
-            {
-                if (driver.Status != DriverStatus.Online || driver.CurrentRideId is not null)
-                    continue;
-
-                var distance = Geo.HaversineMeters(quote.Pickup.Lat, quote.Pickup.Lng, driver.Lat, driver.Lng);
-                if (distance <= DispatchRadiusM)
-                    ranked.Add((driver, distance));
-            }
-
-            ranked.Sort((left, right) =>
-            {
-                var compared = left.Distance.CompareTo(right.Distance);
-                return compared != 0
-                    ? compared
-                    : left.Driver.UserId.CompareTo(right.Driver.UserId);
-            });
-
-            var expiresAt = now.AddSeconds(OfferTtlSeconds);
             var result = new ApiResult.JsonBody<CreatedRideDto>(
                 StatusCodes.Status201Created,
                 new CreatedRideDto(ride.Id));
-
-            var take = Math.Min(MaxOffers, ranked.Count);
-            for (var i = 0; i < take; i++)
-            {
-                var offer = new Offer
-                {
-                    Id = Guid.NewGuid(),
-                    RideId = ride.Id,
-                    DriverId = ranked[i].Driver.UserId,
-                    Round = 1,
-                    Status = OfferStatus.Pending,
-                    ExpiresAt = expiresAt,
-                };
-                _offers.Add(offer);
-                result.Events.Add(new OutboundEvent.OfferReceived(offer.DriverId, ToOfferDto(offer, ride)));
-            }
-
-            result.Events.Add(new OutboundEvent.StatusChanged(ToView(ride), ride.RiderId, null));
+            AdvanceDispatch(ride, now, result.Events);
             return result;
         }
     }
@@ -310,7 +274,7 @@ public sealed class RideStore
                 offer.Status = OfferStatus.Declined;
                 var ride = FindRide(offer.RideId);
                 if (ride is not null)
-                    TryNoDriver(ride, now, result.Events);
+                    AdvanceDispatch(ride, now, result.Events);
             }
 
             return result;
@@ -414,7 +378,7 @@ public sealed class RideStore
             }
 
             foreach (var ride in _rides)
-                TryNoDriver(ride, now, events);
+                AdvanceDispatch(ride, now, events);
 
             return events;
         }
@@ -498,17 +462,88 @@ public sealed class RideStore
         driver.SpeedKmh = 0;
     }
 
-    private void TryNoDriver(Ride ride, DateTimeOffset now, List<OutboundEvent> events)
+    private void AdvanceDispatch(Ride ride, DateTimeOffset now, List<OutboundEvent> events)
     {
         if (ride.Status != RideStatus.Searching)
-            return;
-        if (!_offers.Any(offer => offer.RideId == ride.Id))
             return;
         if (_offers.Any(offer => offer.RideId == ride.Id && offer.Status == OfferStatus.Pending && offer.ExpiresAt > now))
             return;
 
+        var offered = new HashSet<Guid>();
+        var hadOffers = false;
+        foreach (var offer in _offers)
+        {
+            if (offer.RideId != ride.Id)
+                continue;
+            hadOffers = true;
+            offered.Add(offer.DriverId);
+        }
+
+        if (hadOffers && ride.Round >= MaxRounds)
+        {
+            MarkNoDriver(ride, events);
+            return;
+        }
+
+        var ranked = RankDrivers(ride.Pickup.Lat, ride.Pickup.Lng, offered);
+        if (ranked.Count == 0)
+        {
+            MarkNoDriver(ride, events);
+            return;
+        }
+
+        if (hadOffers)
+            ride.Round++;
+
+        var expiresAt = now.AddSeconds(OfferTtlSeconds);
+        var take = Math.Min(MaxOffers, ranked.Count);
+        for (var i = 0; i < take; i++)
+        {
+            var offer = new Offer
+            {
+                Id = Guid.NewGuid(),
+                RideId = ride.Id,
+                DriverId = ranked[i].Driver.UserId,
+                Round = ride.Round,
+                Status = OfferStatus.Pending,
+                ExpiresAt = expiresAt,
+            };
+            _offers.Add(offer);
+            events.Add(new OutboundEvent.OfferReceived(offer.DriverId, ToOfferDto(offer, ride)));
+        }
+
+        events.Add(new OutboundEvent.StatusChanged(ToView(ride), ride.RiderId, null));
+    }
+
+    private void MarkNoDriver(Ride ride, List<OutboundEvent> events)
+    {
         ride.Status = RideStatus.NoDriver;
         events.Add(new OutboundEvent.StatusChanged(ToView(ride), ride.RiderId, null));
+    }
+
+    private List<(Driver Driver, double Distance)> RankDrivers(double lat, double lng, HashSet<Guid> exclude)
+    {
+        var ranked = new List<(Driver Driver, double Distance)>();
+        foreach (var driver in _drivers)
+        {
+            if (exclude.Contains(driver.UserId))
+                continue;
+            if (driver.Status != DriverStatus.Online || driver.CurrentRideId is not null)
+                continue;
+
+            var distance = Geo.HaversineMeters(lat, lng, driver.Lat, driver.Lng);
+            if (distance <= DispatchRadiusM)
+                ranked.Add((driver, distance));
+        }
+
+        ranked.Sort((left, right) =>
+        {
+            var compared = left.Distance.CompareTo(right.Distance);
+            return compared != 0
+                ? compared
+                : left.Driver.UserId.CompareTo(right.Driver.UserId);
+        });
+        return ranked;
     }
 
     private static void ApplyMovement(Driver driver, double lat, double lng, double heading, double movedM)
@@ -551,6 +586,7 @@ public sealed class RideStore
             ride.DurationS,
             ride.FareVnd,
             ride.Route,
+            ride.Round,
             driver);
     }
 

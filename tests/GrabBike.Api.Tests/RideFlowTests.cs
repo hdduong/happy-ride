@@ -12,6 +12,7 @@ public class RideFlowTests
     private const string Linh = "44444444-4444-4444-4444-444444444444";
     private const string Duc = "55555555-5555-5555-5555-555555555555";
     private const string Ha = "66666666-6666-6666-6666-666666666666";
+    private const string Nam = "77777777-7777-7777-7777-777777777777";
 
     private static readonly Pin BenThanh = new(10.77254, 106.69800, "Chợ Bến Thành, District 1");
     private static readonly Pin Bitexco = new(10.77175, 106.70446, "Bitexco Financial Tower, 2 Hai Trieu, District 1");
@@ -158,6 +159,69 @@ public class RideFlowTests
 
         var ride = await Read(await an.GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
         Assert.Equal("Accepted", ride.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Ride_outside_every_cluster_becomes_NoDriver()
+    {
+        await using var fixture = new ApiFactory();
+        var quote = await Read(await fixture.Client(An).PostAsJsonAsync("/api/quotes", new
+        {
+            pickup = new Pin(16.047, 108.206, "Da Nang"),
+            dropoff = new Pin(16.067, 108.220, "Nearby"),
+        }), HttpStatusCode.Created);
+        var created = await Read(await fixture.Client(An).PostAsJsonAsync("/api/rides", new
+        {
+            quoteId = quote.GetProperty("quoteId").GetGuid(),
+        }), HttpStatusCode.Created);
+
+        var ride = await Read(
+            await fixture.Client(An).GetAsync($"/api/rides/{created.GetProperty("rideId").GetGuid()}"),
+            HttpStatusCode.OK);
+        Assert.Equal("NoDriver", ride.GetProperty("status").GetString());
+        Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), created.GetProperty("rideId").GetGuid()));
+    }
+
+    [Fact]
+    public async Task Declining_the_first_round_offers_the_remaining_driver()
+    {
+        await using var fixture = new ApiFactory();
+        var rideId = await CreateRide(fixture.Client(An));
+        foreach (var driverId in new[] { Khoa, Linh, Duc })
+        {
+            var offerId = await PendingOffer(fixture.Client(driverId), rideId);
+            Assert.NotEqual(Guid.Empty, offerId);
+            await Read(await fixture.Client(driverId).PostAsync($"/api/offers/{offerId}/decline", content: null), HttpStatusCode.OK);
+        }
+
+        var haOffers = await Read(await fixture.Client(Ha).GetAsync("/api/offers/pending"), HttpStatusCode.OK);
+        var haOffer = Assert.Single(haOffers.EnumerateArray(), item => item.GetProperty("rideId").GetGuid() == rideId);
+        Assert.Equal(2, haOffer.GetProperty("round").GetInt32());
+
+        var ride = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("Searching", ride.GetProperty("status").GetString());
+        Assert.Equal(2, ride.GetProperty("round").GetInt32());
+    }
+
+    [Fact]
+    public async Task Hanoi_rider_quote_is_near_Hoan_Kiem()
+    {
+        await using var fixture = new ApiFactory();
+        var quote = await Read(await fixture.Client(Nam).PostAsJsonAsync("/api/quotes", new
+        {
+            pickup = new Pin(21.0287, 105.8524, "Hồ Hoàn Kiếm"),
+            dropoff = new Pin(21.0300, 105.8540, "Nearby"),
+        }), HttpStatusCode.Created);
+        var created = await Read(await fixture.Client(Nam).PostAsJsonAsync("/api/rides", new
+        {
+            quoteId = quote.GetProperty("quoteId").GetGuid(),
+        }), HttpStatusCode.Created);
+        var rideId = created.GetProperty("rideId").GetGuid();
+
+        var ride = await Read(await fixture.Client(Nam).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("Searching", ride.GetProperty("status").GetString());
+        Assert.NotEqual(Guid.Empty, await PendingOffer(fixture.Client("99999999-9999-9999-9999-999999999999"), rideId));
+        Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), rideId));
     }
 
     private static async Task<Guid> CreateRide(HttpClient rider)

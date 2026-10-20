@@ -141,6 +141,7 @@ export function asRide(value: unknown): RideView | null {
     durationS: num(row, "durationS", "DurationS") ?? 0,
     fareVnd: num(row, "fareVnd", "FareVnd") ?? 0,
     route: asRoute(row.route ?? row.Route) ?? { type: "LineString", coordinates: [] },
+    round: num(row, "round", "Round") ?? 1,
     driver: driverValue == null ? null : asDriver(driverValue),
   };
 }

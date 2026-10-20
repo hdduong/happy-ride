@@ -7,11 +7,26 @@ export const DEFAULT_PICKUP = {
   lng: 106.698,
 };
 
-export const HANOI_CENTER: LatLng = { lat: 21.0287, lng: 105.8524 };
+export const HANOI_PICKUP = {
+  name: "Hồ Hoàn Kiếm",
+  address: "Hồ Hoàn Kiếm, Hanoi",
+  lat: 21.0287,
+  lng: 105.8524,
+};
+
+export const HANOI_CENTER: LatLng = { lat: HANOI_PICKUP.lat, lng: HANOI_PICKUP.lng };
+
+export function isHanoi(city: string | undefined): boolean {
+  return Boolean(city && /hanoi|ha noi|hà nội/i.test(city));
+}
+
+export function pickupForCity(city: string | undefined) {
+  return isHanoi(city) ? HANOI_PICKUP : DEFAULT_PICKUP;
+}
 
 export function centerForCity(city: string | undefined): LatLng {
-  if (city && /hanoi|ha noi|hà nội/i.test(city)) return HANOI_CENTER;
-  return { lat: DEFAULT_PICKUP.lat, lng: DEFAULT_PICKUP.lng };
+  const pickup = pickupForCity(city);
+  return { lat: pickup.lat, lng: pickup.lng };
 }
 
 export function isPlotted(point: LatLng | null | undefined): point is LatLng {

@@ -54,6 +54,7 @@ export type RideView = {
   durationS: number;
   fareVnd: number;
   route: GeoLine;
+  round: number;
   driver: RideDriver | null;
 };
 

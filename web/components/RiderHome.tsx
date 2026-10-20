@@ -10,17 +10,16 @@ import {
   getCurrentRide,
   getPlace,
   getRide,
+  getUsers,
   messageFrom,
 } from "@/lib/api";
 import { formatEta, formatKm, formatMinutes, formatVnd, initials, minutesFromSeconds, shortPlace } from "@/lib/format";
-import { bearing, DEFAULT_PICKUP, haversineMeters, isPlotted, linePoints } from "@/lib/geo";
+import { bearing, DEFAULT_PICKUP, haversineMeters, isPlotted, linePoints, pickupForCity } from "@/lib/geo";
 import { openRideConnection } from "@/lib/signalr";
 import { applyRiderUpdate, isActiveStatus, preferForward, withEpoch } from "@/lib/rides";
 import type { DriverLocation, Place, Quote, RideView } from "@/lib/types";
 import { MapCanvas, type MapMarker } from "@/components/MapCanvas";
 import { ErrorLine, PrimaryButton, Stage, TextButton } from "@/components/ui";
-
-const FINDING_SUBTITLE = "Round 1 of 3 \u00b7 within 3 km";
 
 export function RiderHome({ userId }: { userId: string }) {
   const [query, setQuery] = useState("");
@@ -33,10 +32,25 @@ export function RiderHome({ userId }: { userId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [quoting, setQuoting] = useState(false);
+  const [home, setHome] = useState(DEFAULT_PICKUP);
   const searchSeq = useRef(0);
   const epoch = useRef(0);
   const ignored = useRef(new Set<string>());
   const allowSearch = !ride;
+
+  useEffect(() => {
+    let cancel = false;
+    getUsers(userId)
+      .then((users) => {
+        if (cancel) return;
+        const person = users.find((user) => user.id === userId);
+        setHome(pickupForCity(person?.city));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     return openRideConnection(userId, {
@@ -89,7 +103,7 @@ export function RiderHome({ userId }: { userId: string }) {
     setSearching(true);
     const handle = window.setTimeout(() => {
       const seq = ++searchSeq.current;
-      void autocomplete(userId, text, DEFAULT_PICKUP.lat, DEFAULT_PICKUP.lng)
+      void autocomplete(userId, text, home.lat, home.lng)
         .then((places) => {
           if (searchSeq.current === seq) setResults(places);
         })
@@ -103,7 +117,7 @@ export function RiderHome({ userId }: { userId: string }) {
         });
     }, 300);
     return () => window.clearTimeout(handle);
-  }, [allowSearch, query, userId]);
+  }, [allowSearch, home.lat, home.lng, query, userId]);
 
   async function choosePlace(suggestion: Place) {
     setError(null);
@@ -113,7 +127,7 @@ export function RiderHome({ userId }: { userId: string }) {
       const place = await getPlace(userId, suggestion.id);
       const nextQuote = await createQuote(
         userId,
-        { lat: DEFAULT_PICKUP.lat, lng: DEFAULT_PICKUP.lng, address: DEFAULT_PICKUP.name },
+        { lat: home.lat, lng: home.lng, address: home.name },
         { lat: place.lat, lng: place.lng, address: place.name || place.address },
       );
       setDestination(place);
@@ -144,7 +158,8 @@ export function RiderHome({ userId }: { userId: string }) {
       const fallback: RideView = {
         rideId,
         status: "Searching",
-        pickup: { lat: DEFAULT_PICKUP.lat, lng: DEFAULT_PICKUP.lng, address: DEFAULT_PICKUP.name },
+        pickup: { lat: home.lat, lng: home.lng, address: home.name },
+        round: 1,
         dropoff: {
           lat: currentDestination.lat,
           lng: currentDestination.lng,
@@ -208,9 +223,9 @@ export function RiderHome({ userId }: { userId: string }) {
   }
 
   const pickup = ride?.pickup ?? {
-    lat: DEFAULT_PICKUP.lat,
-    lng: DEFAULT_PICKUP.lng,
-    address: DEFAULT_PICKUP.name,
+    lat: home.lat,
+    lng: home.lng,
+    address: home.name,
   };
   const dropoff =
     ride?.dropoff ??
@@ -248,6 +263,7 @@ export function RiderHome({ userId }: { userId: string }) {
 
   let sheet = (
     <SearchSheet
+      pickupName={home.name}
       query={query}
       results={results}
       searching={searching}
@@ -279,7 +295,7 @@ export function RiderHome({ userId }: { userId: string }) {
     sheet = (
       <div className="stack">
         <h1>No driver nearby</h1>
-        <p className="muted">Searched 3 rounds within 3 km.</p>
+        <p className="muted">No driver was free within 3 km.</p>
         <ErrorLine message={error} />
         <PrimaryButton onClick={resetToSearch}>Search again</PrimaryButton>
       </div>
@@ -320,7 +336,7 @@ export function RiderHome({ userId }: { userId: string }) {
     sheet = (
       <div className="stack">
         <h1 data-testid="finding-driver">Finding a driver</h1>
-        <p className="muted">{FINDING_SUBTITLE}</p>
+        <p className="muted">Round {ride.round || 1} of 3 · within 3 km</p>
         <ErrorLine message={error} />
         <TextButton data-testid="cancel-ride" disabled={busy} onClick={() => void onCancel()}>
           Cancel ride
@@ -332,7 +348,7 @@ export function RiderHome({ userId }: { userId: string }) {
     sheet = (
       <div className="stack">
         <p className="route-line" translate="no">
-          {DEFAULT_PICKUP.name} {"\u2192"} {destination.name}
+          {home.name} {"\u2192"} {destination.name}
         </p>
         <p className="muted">
           {formatKm(quote.distanceM)} {"\u00b7"} {formatMinutes(quote.durationS)}
@@ -450,6 +466,7 @@ function riderEta(ride: RideView, live: DriverLocation | null): string {
 }
 
 function SearchSheet({
+  pickupName,
   query,
   results,
   searching,
@@ -458,6 +475,7 @@ function SearchSheet({
   onQuery,
   onChoose,
 }: {
+  pickupName: string;
   query: string;
   results: Place[];
   searching: boolean;
@@ -471,7 +489,7 @@ function SearchSheet({
       <div>
         <div className="kicker">Your location</div>
         <div className="strong" translate="no">
-          {DEFAULT_PICKUP.name}
+          {pickupName}
         </div>
       </div>
       <input

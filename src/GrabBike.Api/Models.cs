@@ -144,6 +144,7 @@ public sealed record RideView(
     int DurationS,
     int FareVnd,
     GeoRoute Route,
+    int Round,
     DriverSnapshot? Driver);
 
 public sealed record OfferDto(
