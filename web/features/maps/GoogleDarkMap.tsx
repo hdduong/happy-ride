@@ -89,7 +89,7 @@ function GoogleOverlays({
       map.setZoom(15);
     } else {
       for (const point of points) bounds.extend(point);
-      if (!bounds.isEmpty()) map.fitBounds(bounds, 80);
+      if (!bounds.isEmpty()) map.fitBounds(bounds, { top: 80, right: 48, bottom: 280, left: 48 });
     }
     return () => {
       for (const marker of drawn) marker.setMap(null);

@@ -31,7 +31,16 @@ public sealed class ServiceBusDispatchWorker(
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
             while (await timer.WaitForNextTickAsync(stoppingToken))
-                await RecoverUnpublishedAsync(stoppingToken);
+            {
+                try
+                {
+                    await RecoverUnpublishedAsync(stoppingToken);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    logger.LogError(exception, "Dispatch recovery tick failed");
+                }
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
