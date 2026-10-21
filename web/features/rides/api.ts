@@ -1,6 +1,8 @@
 import { request } from "@/shared/api/client";
 import { asOffers, asRide, asRideId } from "./parse";
 import type { RideView, Offer } from "./types";
+import { getActivityClient } from "@/shared/telemetry/browser";
+import { recordAction, type ActivityAction, type Correlation } from "@/shared/telemetry/activity";
 
 function requireRide(value: unknown, label: string): RideView {
   const ride = asRide(value);
@@ -8,19 +10,22 @@ function requireRide(value: unknown, label: string): RideView {
   return ride;
 }
 
-export async function createRide(userId: string, quoteId: string): Promise<string> {
-  const payload = await request<unknown>("/api/rides", {
-    method: "POST",
-    userId,
-    body: { quoteId },
-  });
-  const rideId = asRideId(payload);
-  if (!rideId) throw new Error("Ride response was incomplete");
-  return rideId;
+export function createRide(userId: string, quoteId: string): Promise<string> {
+  return recordAction(getActivityClient(userId), "Book", {}, async (telemetry) => {
+    const payload = await request<unknown>("/api/rides", {
+      method: "POST", userId, body: { quoteId }, telemetry,
+    });
+    const rideId = asRideId(payload);
+    if (!rideId) throw new Error("Ride response was incomplete");
+    return rideId;
+  }, (rideId) => rideId);
 }
 
 export async function getRide(userId: string, rideId: string): Promise<RideView> {
-  const payload = await request<unknown>(`/api/rides/${encodeURIComponent(rideId)}`, { userId });
+  const telemetry = getActivityClient(userId)?.correlation();
+  const payload = await request<unknown>(`/api/rides/${encodeURIComponent(rideId)}`, {
+    userId, telemetry: telemetry ? { ...telemetry, rideId } : undefined,
+  });
   return requireRide(payload, "Ride response");
 }
 
@@ -30,10 +35,11 @@ export async function getCurrentRide(userId: string): Promise<RideView | null> {
   return requireRide(payload, "Ride response");
 }
 
-async function postRide(userId: string, rideId: string, action: string): Promise<RideView | null> {
+async function postRide(userId: string, rideId: string, action: string, telemetry?: Correlation): Promise<RideView | null> {
   const payload = await request<unknown>(`/api/rides/${encodeURIComponent(rideId)}/${action}`, {
     method: "POST",
     userId,
+    telemetry,
   });
   if (payload == null) return getCurrentRide(userId);
   const ride = asRide(payload);
@@ -42,11 +48,13 @@ async function postRide(userId: string, rideId: string, action: string): Promise
 }
 
 export function cancelRide(userId: string, rideId: string): Promise<RideView | null> {
-  return postRide(userId, rideId, "cancel");
+  return recordAction(getActivityClient(userId), "Cancel", { rideId }, (telemetry) =>
+    postRide(userId, rideId, "cancel", telemetry));
 }
 
 export function confirmArrival(userId: string, rideId: string): Promise<RideView | null> {
-  return postRide(userId, rideId, "confirm-arrival");
+  return recordAction(getActivityClient(userId), "ConfirmArrival", { rideId }, (telemetry) =>
+    postRide(userId, rideId, "confirm-arrival", telemetry));
 }
 
 export function rideAction(
@@ -54,28 +62,31 @@ export function rideAction(
   rideId: string,
   action: "arrived" | "start" | "dropoff",
 ): Promise<RideView | null> {
-  return postRide(userId, rideId, action);
+  const event: ActivityAction = action === "arrived" ? "Arrived" : action === "start" ? "Start" : "Dropoff";
+  return recordAction(getActivityClient(userId), event, { rideId }, (telemetry) =>
+    postRide(userId, rideId, action, telemetry));
 }
 
 export function getPendingOffers(userId: string): Promise<Offer[]> {
   return request<unknown>("/api/offers/pending", { userId }).then((payload) => asOffers(payload));
 }
 
-export async function acceptOffer(userId: string, offerId: string): Promise<RideView> {
-  const payload = await request<unknown>(`/api/offers/${encodeURIComponent(offerId)}/accept`, {
-    method: "POST",
-    userId,
+export function acceptOffer(userId: string, offerId: string, rideId: string): Promise<RideView> {
+  return recordAction(getActivityClient(userId), "AcceptOffer", { rideId, offerId }, async (telemetry) => {
+    const payload = await request<unknown>(`/api/offers/${encodeURIComponent(offerId)}/accept`, {
+      method: "POST", userId, telemetry,
+    });
+    const ride = asRide(payload);
+    if (ride) return ride;
+    const current = await getCurrentRide(userId);
+    if (!current) throw new Error("Accept did not return a ride");
+    return current;
   });
-  const ride = asRide(payload);
-  if (ride) return ride;
-  const current = await getCurrentRide(userId);
-  if (!current) throw new Error("Accept did not return a ride");
-  return current;
 }
 
-export function declineOffer(userId: string, offerId: string): Promise<void> {
-  return request<unknown>(`/api/offers/${encodeURIComponent(offerId)}/decline`, {
-    method: "POST",
-    userId,
-  }).then(() => undefined);
+export function declineOffer(userId: string, offerId: string, rideId: string): Promise<void> {
+  return recordAction(getActivityClient(userId), "DeclineOffer", { rideId, offerId }, (telemetry) =>
+    request<unknown>(`/api/offers/${encodeURIComponent(offerId)}/decline`, {
+      method: "POST", userId, telemetry,
+    }).then(() => undefined));
 }

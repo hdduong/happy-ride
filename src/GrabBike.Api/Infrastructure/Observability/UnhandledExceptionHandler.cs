@@ -15,6 +15,7 @@ public sealed class UnhandledExceptionHandler(ILogger<UnhandledExceptionHandler>
             : StatusCodes.Status500InternalServerError;
         if (status >= 500)
         {
+            using var actorScope = logger.BeginScope(ActorTelemetry.From(context));
             logger.LogError(Unhandled, exception,
                 "Unhandled failure for {Method} {Route}; trace {TraceId}",
                 telemetry.Method, telemetry.Route, telemetry.TraceId);

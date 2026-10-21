@@ -6,12 +6,13 @@ type Connection = { start: () => Promise<void>; stop: () => Promise<void> };
 export function openConnection(
   build: (isActive: () => boolean) => { connection: Connection },
   reportError: (error: unknown) => void,
+  onConnected: () => void = () => {},
 ): () => void {
   let active = true;
   const { connection } = build(() => active);
   const stop = () => connection.stop().catch(() => undefined);
   void connection.start()
-    .then(() => { if (!active) return stop(); })
+    .then(() => { if (!active) return stop(); onConnected(); })
     .catch((error: unknown) => { if (active) reportError(error); });
   return () => {
     if (!active) return;

@@ -17,6 +17,8 @@ using Npgsql;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Azure.Messaging.ServiceBus;
+using GrabBike.Api.Features.Telemetry;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddApplicationObservability();
@@ -91,6 +93,17 @@ builder.Services.AddScoped<IRideRepository, RideRepository>();
 builder.Services.AddScoped<IOfferRepository, OfferRepository>();
 
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ActivityContextResolver>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("client-activity", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Items["CurrentUser"] is User user ? user.Id.ToString("D") : "anonymous",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0,
+        }));
+});
 builder.Services.AddHttpClient<VietMapMapProvider>(client => client.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddHttpClient<GoogleMapProvider>(client => client.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddScoped<FakeMapProvider>();
@@ -143,22 +156,22 @@ await using (var scope = app.Services.CreateAsyncScope())
 
 app.UseApplicationObservability();
 
-if (app.Environment.IsDevelopment())
+// One Swashbuckle document, generated from the controllers. Swagger UI and Scalar both render it.
+// These routes stay available in Production; they are not a Development-only convenience.
+app.UseSwagger();
+app.UseSwaggerUI();
+app.MapScalarApiReference(options =>
 {
-    // One Swashbuckle document, generated from the controllers. Swagger UI and Scalar both render it.
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    app.MapScalarApiReference(options =>
-    {
-        options.WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json");
-    });
-    app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
-    app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
-}
+    options.WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json");
+});
+app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
+app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
 
 app.UseCors();
 app.UseEntraApiTokens();
 app.UseMiddleware<DevIdentityMiddleware>();
+app.UseMiddleware<ActorTelemetryMiddleware>();
+app.UseRateLimiter();
 app.MapHub<RideHub>("/hubs/ride");
 app.MapControllers();
 

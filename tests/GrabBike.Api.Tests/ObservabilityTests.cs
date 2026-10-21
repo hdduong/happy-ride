@@ -25,7 +25,7 @@ using OpenTelemetry.Trace;
 namespace GrabBike.Api.Tests;
 
 [Collection(PostgresCollection.Name)]
-public sealed class ObservabilityTests(PostgresFixture postgres)
+public sealed partial class ObservabilityTests(PostgresFixture postgres)
 {
     private const string Rider = "11111111-1111-1111-1111-111111111111";
     private const string Sensitive = "PRIVATE-request-marker";
@@ -323,7 +323,8 @@ public sealed class ObservabilityTests(PostgresFixture postgres)
                 {
                     if (scope is IEnumerable<KeyValuePair<string, object?>> pairs)
                         foreach (var pair in pairs)
-                            values[pair.Key] = pair.Value;
+                            // Azure Monitor keeps the first (outermost) scope value.
+                            values.TryAdd(pair.Key, pair.Value);
                 }, scopes);
                 owner.Entries.Enqueue(new CapturedLog(level, eventId, formatter(state, exception), exception, fields, scopes));
             }

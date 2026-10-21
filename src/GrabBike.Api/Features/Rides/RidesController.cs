@@ -1,6 +1,7 @@
 using GrabBike.Api.Features.Dev;
 using GrabBike.Api.Features.Realtime;
 using Microsoft.AspNetCore.Mvc;
+using GrabBike.Api.Infrastructure.Observability;
 
 namespace GrabBike.Api.Features.Rides;
 
@@ -84,6 +85,13 @@ public sealed class RidesController(IRideService rides, IRideNotifications notif
 
     private async Task<IActionResult> RespondAsync(RideOutcome result, CancellationToken cancellationToken)
     {
+        var rideId = result switch
+        {
+            RideOutcome.Created created => (Guid?)created.Body.RideId,
+            RideOutcome.Updated updated => updated.Body.RideId,
+            _ => null,
+        };
+        HttpContext.Features.Get<ActorTelemetry>()?.Set("RideId", rideId);
         // Application commands have committed before returning an outcome.
         await notifications.DeliverAsync(result.Events, cancellationToken);
         return result.ToActionResult();

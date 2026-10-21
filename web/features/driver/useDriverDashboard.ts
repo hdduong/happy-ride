@@ -36,7 +36,7 @@ export function useDriverDashboard(userId: string) {
     setError(null);
     try {
       await session.command(async () => {
-        const accepted = await acceptOffer(userId, offer.offerId);
+        const accepted = await acceptOffer(userId, offer.offerId, offer.rideId);
         session.receiveRide(accepted);
         session.closeOffersForRide(accepted.rideId);
       });
@@ -52,7 +52,7 @@ export function useDriverDashboard(userId: string) {
     setError(null);
     try {
       await session.command(async () => {
-        await declineOffer(userId, offer.offerId);
+        await declineOffer(userId, offer.offerId, offer.rideId);
         session.closeOffer({ offerId: offer.offerId, reason: "Declined" });
       });
     } catch (reason: unknown) {

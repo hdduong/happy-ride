@@ -165,7 +165,28 @@ jobs:
                 AZURE_API_CLIENT_ID="$AZURE_API_CLIENT_ID" \
                 AZURE_API_SCOPE="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
           else
-            echo "Entra application token is not configured. The API remains open until AZURE_TENANT_ID, AZURE_API_CLIENT_ID, and AZURE_CLIENT_SECRET are set."
+            echo "Entra application token is not configured. Clearing any stored Entra settings so the API does not keep a stale token requirement."
+            rg="${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}"
+            delete_settings() {
+              local app="$1"
+              shift
+              local existing
+              existing="$(az webapp config appsettings list --resource-group "$rg" --name "$app" --query "[].name" -o tsv)"
+              local remove=()
+              local name
+              for name in "$@"; do
+                if printf '%s\n' "$existing" | grep -Fxq "$name"; then
+                  remove+=("$name")
+                fi
+              done
+              if [ "${#remove[@]}" -gt 0 ]; then
+                az webapp config appsettings delete --resource-group "$rg" --name "$app" --setting-names "${remove[@]}"
+              fi
+            }
+            delete_settings "${AZURE_API_APP:-app-grabbike-api}" \
+              AzureAd__TenantId AzureAd__ClientId AzureAd__Audience AzureAd__AllowedClientId
+            delete_settings "${AZURE_WEB_APP:-app-grabbike-web}" \
+              AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_API_CLIENT_ID AZURE_API_SCOPE
           fi
           rm -f infra-outputs.json
 
