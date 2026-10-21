@@ -103,8 +103,9 @@ test("the hub query keeps the sealed persona and drops any other user id key", (
   assert.equal(url.searchParams.get("appSessionId"), "s");
 });
 
-test("only the user list can be read before a persona cookie exists", () => {
+test("only the user list and map config can be read before a persona exists", () => {
   assert.equal(allowsAnonymousBootstrap("GET", "/api/dev/users"), true);
+  assert.equal(allowsAnonymousBootstrap("GET", "/api/map-config"), true);
   assert.equal(allowsAnonymousBootstrap("POST", "/api/dev/users"), false);
   assert.equal(allowsAnonymousBootstrap("GET", "/api/rides/current"), false);
   assert.equal(allowsAnonymousBootstrap("GET", "/hubs/ride"), false);

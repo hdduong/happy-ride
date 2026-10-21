@@ -51,7 +51,7 @@ public sealed partial class ObservabilityTests
         Assert.NotEqual(oldRideId, created.RideId);
         var booked = Assert.Single(factory.Logs.Entries, entry => entry.Event.Name == "RideBooked");
         Assert.Equal(created.RideId, booked.Fields["RideId"]);
-        Assert.Equal("An Nguyễn", booked.Scopes["Username"]);
+        Assert.Equal("HCMR01 Rider01", booked.Scopes["Username"]);
         Assert.Equal(activityId, booked.Scopes["ActivityId"]);
         Assert.False(booked.Scopes.ContainsKey("RideId"));
         var completion = Assert.Single(factory.Logs.Entries, entry => entry.Event.Id == 1000);
@@ -78,7 +78,7 @@ public sealed partial class ObservabilityTests
         Assert.All(entries, entry =>
         {
             Assert.Equal(Guid.Parse(Rider), entry.Scopes["ActorId"]);
-            Assert.Equal("An Nguyễn", entry.Scopes["Username"]);
+            Assert.Equal("HCMR01 Rider01", entry.Scopes["Username"]);
             Assert.Equal("rider", entry.Scopes["ActorRole"]);
             Assert.Equal("Browser", entry.Fields["Source"]);
             Assert.Equal(sessionId, entry.Scopes["AppSessionId"]);
@@ -136,7 +136,7 @@ public sealed partial class ObservabilityTests
         using var goodResponse = await client.SendAsync(goodRequest);
         Assert.Equal(HttpStatusCode.NoContent, goodResponse.StatusCode);
         var logged = Assert.Single(factory.Logs.Entries, entry => entry.Event.Id == 2300);
-        Assert.Equal("Khoa Phạm", logged.Scopes["Username"]);
+        Assert.Equal("HCMD01 Driver01", logged.Scopes["Username"]);
         Assert.Equal("signalr-connection", logged.Scopes["SignalRConnectionId"]);
         Assert.Equal(offerId, logged.Scopes["OfferId"]);
         Assert.Equal(rideId, logged.Scopes["RideId"]);
@@ -161,7 +161,7 @@ public sealed partial class ObservabilityTests
         foreach (var eventId in new[] { 1000, 1001 })
         {
             var entry = Assert.Single(factory.Logs.Entries, entry => entry.Event.Id == eventId);
-            Assert.Equal("An Nguyễn", entry.Scopes["Username"]);
+            Assert.Equal("HCMR01 Rider01", entry.Scopes["Username"]);
             Assert.Equal(Guid.Parse(Rider), entry.Scopes["ActorId"]);
             Assert.Equal(sessionId, entry.Scopes["AppSessionId"]);
             Assert.Equal(activityId, entry.Scopes["ActivityId"]);
@@ -186,7 +186,7 @@ public sealed partial class ObservabilityTests
             Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         }
         var completion = Assert.Single(factory.Logs.Entries, entry => entry.Event.Id == 1000);
-        Assert.Equal("Mai Trần", completion.Scopes["Username"]);
+        Assert.Equal("HCMR02 Rider02", completion.Scopes["Username"]);
         Assert.False(completion.Scopes.ContainsKey("RideId"));
         Assert.False(completion.Scopes.ContainsKey("AppSessionId"));
         Assert.False(completion.Scopes.ContainsKey("ActivityId"));
@@ -198,7 +198,7 @@ public sealed partial class ObservabilityTests
         using var cancelled = await client.SendAsync(cancel);
         Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
         var business = Assert.Single(factory.Logs.Entries, entry => entry.Event.Name == "RideStatusChanged");
-        Assert.Equal("An Nguyễn", business.Scopes["Username"]);
+        Assert.Equal("HCMR01 Rider01", business.Scopes["Username"]);
         Assert.Equal(rideId, business.Scopes["RideId"]);
     }
 
@@ -231,10 +231,10 @@ public sealed partial class ObservabilityTests
     }
 
     [Theory]
-    [InlineData(Rider, "An Nguyễn", RideStatus.InProgress, true)]
-    [InlineData(Driver, "Khoa Phạm", RideStatus.InProgress, true)]
-    [InlineData(Driver, "Khoa Phạm", RideStatus.DroppedOff, false)]
-    [InlineData(Rider, "An Nguyễn", RideStatus.DroppedOff, true)]
+    [InlineData(Rider, "HCMR01 Rider01", RideStatus.InProgress, true)]
+    [InlineData(Driver, "HCMD01 Driver01", RideStatus.InProgress, true)]
+    [InlineData(Driver, "HCMD01 Driver01", RideStatus.DroppedOff, false)]
+    [InlineData(Rider, "HCMR01 Rider01", RideStatus.DroppedOff, true)]
     public async Task Real_SignalR_disconnect_resolves_a_ride_started_after_connect_without_ending_it(
         string userId, string username, RideStatus status, bool hasRideContext)
     {

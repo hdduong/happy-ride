@@ -4,8 +4,12 @@ import { getUsers } from "./api";
 import { messageFrom } from "@/shared/api/client";
 import type { DevUser } from "./types";
 import { forcedUserId, homeForRole, isDriverRole, rememberPersona } from "./storage";
+import { MapCanvas } from "@/features/maps/MapCanvas";
+import { HANOI_CENTER } from "@/features/maps/geo";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+const cityOrder = ["Hanoi", "HCMC"];
 
 export function UserPicker() {
   const router = useRouter();
@@ -43,13 +47,16 @@ export function UserPicker() {
     router.push(homeForRole(user.role));
   }
 
-  const groups = groupByCity(users);
+  const cities = citiesInOrder(users);
 
   return (
     <main className="screen">
-      <div className="screen-inner">
+      <div className="screen-inner picker">
         <h1>Happy Ride</h1>
         <p className="lead">Choose a rider or a driver</p>
+        <div className="picker-map" data-testid="hanoi-map">
+          <MapCanvas center={HANOI_CENTER} zoom={12} />
+        </div>
         {loading ? <p className="muted">Loading people…</p> : null}
         {error ? (
           <p className="sheet-error" role="alert">
@@ -59,34 +66,70 @@ export function UserPicker() {
         {!loading && users.length === 0 && !error ? (
           <p className="muted">No riders or drivers are available.</p>
         ) : null}
-        {groups.map((group) => (
-          <section key={group.city}>
-            <h2 className="city" translate="no">
-              {group.city}
-            </h2>
-            {group.users.map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                className="user-row"
-                data-testid="user"
-                data-userid={user.id}
-                onClick={() => choose(user)}
-              >
-                <span className="user-copy">
-                  <span className="user-name" translate="no">
-                    {user.name}
-                  </span>
-                  <span className="user-meta" translate="no">
-                    {roleLabel(user)}
-                  </span>
-                </span>
-              </button>
+        <div className="persona-columns">
+          <section aria-label="Riders" data-testid="rider-column">
+            <h2>Riders</h2>
+            {cities.map((city) => (
+              <CityPeople
+                key={city}
+                city={city}
+                users={users.filter((user) => user.city === city && !isDriverRole(user.role))}
+                onChoose={choose}
+              />
             ))}
           </section>
-        ))}
+          <section aria-label="Drivers" data-testid="driver-column">
+            <h2>Drivers</h2>
+            {cities.map((city) => (
+              <CityPeople
+                key={city}
+                city={city}
+                users={users.filter((user) => user.city === city && isDriverRole(user.role))}
+                onChoose={choose}
+              />
+            ))}
+          </section>
+        </div>
       </div>
     </main>
+  );
+}
+
+function CityPeople({
+  city,
+  users,
+  onChoose,
+}: {
+  city: string;
+  users: DevUser[];
+  onChoose: (user: DevUser) => void;
+}) {
+  if (users.length === 0) return null;
+  return (
+    <div>
+      <h3 className="city" translate="no">
+        {cityLabel(city)}
+      </h3>
+      {users.map((user) => (
+        <button
+          key={user.id}
+          type="button"
+          className="user-row"
+          data-testid="user"
+          data-userid={user.id}
+          onClick={() => onChoose(user)}
+        >
+          <span className="user-copy">
+            <span className="user-name" translate="no">
+              {user.name}
+            </span>
+            <span className="user-meta" translate="no">
+              {roleLabel(user)}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -95,12 +138,15 @@ function roleLabel(user: DevUser): string {
   return user.plate ? `Driver \u00b7 ${user.plate}` : "Driver";
 }
 
-function groupByCity(users: DevUser[]): Array<{ city: string; users: DevUser[] }> {
-  const groups: Array<{ city: string; users: DevUser[] }> = [];
-  for (const user of users) {
-    const existing = groups.find((group) => group.city === user.city);
-    if (existing) existing.users.push(user);
-    else groups.push({ city: user.city, users: [user] });
+function cityLabel(city: string): string {
+  return city === "HCMC" ? "Ho Chi Minh City" : city;
+}
+
+function citiesInOrder(users: DevUser[]): string[] {
+  const present = new Set(users.map((user) => user.city));
+  const ordered = cityOrder.filter((city) => present.has(city));
+  for (const city of present) {
+    if (!ordered.includes(city)) ordered.push(city);
   }
-  return groups;
+  return ordered;
 }

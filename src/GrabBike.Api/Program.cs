@@ -31,7 +31,7 @@ builder.Services.AddEndpointsApiExplorer();
 var entraConfigured = EntraApiAuthentication.IsConfigured(builder.Configuration);
 builder.Services.AddSwaggerGen(options =>
 {
-    var description = "Seeded rider An Nguyen: 11111111-1111-1111-1111-111111111111. Driver Khoa Pham: 33333333-3333-3333-3333-333333333333. Send the id in the X-User-Id header.";
+    var description = "Seeded rider HCMR01 Rider01: 11111111-1111-1111-1111-111111111111. Driver HCMD01 Driver01: 33333333-3333-3333-3333-333333333333. Send the id in the X-User-Id header.";
     if (entraConfigured)
         description += " Also send Authorization: Bearer with the Entra application token.";
     options.SwaggerDoc("v1", new OpenApiInfo

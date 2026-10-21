@@ -24,7 +24,7 @@ export function isForwardedPath(path: string): boolean {
 }
 
 export function allowsAnonymousBootstrap(method: string, path: string): boolean {
-  return method === "GET" && path === "/api/dev/users";
+  return method === "GET" && (path === "/api/dev/users" || path === "/api/map-config");
 }
 
 export function bindPersonaQuery(url: URL, actor: string): void {

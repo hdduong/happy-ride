@@ -37,7 +37,7 @@ jobs:
     timeout-minutes: 45
     environment:
       name: production
-      url: https://app-grabbike-web.azurewebsites.net
+      url: ${{ vars.WEB_BASE_URL || 'https://app-grabbike-web.azurewebsites.net' }}
     steps:
       - name: Check out main
         uses: actions/checkout@v4
@@ -77,7 +77,7 @@ jobs:
       - name: Build the web app
         working-directory: web
         env:
-          NEXT_PUBLIC_API_BASE_URL: https://app-grabbike-api.azurewebsites.net
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.API_BASE_URL || 'https://app-grabbike-api.azurewebsites.net' }}
         run: |
           npm ci
           npm run build
@@ -89,9 +89,15 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Prepare App Service and API monitoring
+      - name: Prepare App Service and API/web monitoring
         env:
           APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_APP_SERVICE_PLAN: ${{ vars.AZURE_APP_SERVICE_PLAN }}
+          AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          AZURE_WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS }}
           AZURE_APPLICATION_INSIGHTS: ${{ vars.AZURE_APPLICATION_INSIGHTS }}
           AZURE_LOG_ANALYTICS_WORKSPACE: ${{ vars.AZURE_LOG_ANALYTICS_WORKSPACE }}
           AZURE_LOG_RETENTION_DAYS: ${{ vars.AZURE_LOG_RETENTION_DAYS }}
@@ -101,6 +107,11 @@ jobs:
       - name: Deploy Postgres and Service Bus
         env:
           POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          AZURE_WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          MAPS_PROVIDER: ${{ vars.MAPS_PROVIDER }}
           VIETMAP_API_KEY: ${{ secrets.VIETMAP_API_KEY }}
           VIETMAP_TILEMAP_KEY: ${{ secrets.VIETMAP_TILEMAP_KEY }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
@@ -119,17 +130,20 @@ jobs:
             --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
             --name grabbike \
             --template-file infra/main.bicep \
-            --parameters postgresAdminPassword="$POSTGRES_ADMIN_PASSWORD" \
+            --parameters postgresAdminPassword="$POSTGRES_ADMIN_PASSWORD" location="${AZURE_LOCATION:-southeastasia}" \
             --query properties.outputs \
             --output json > infra-outputs.json
           host="$(python3 -c 'import json; print(json.load(open("infra-outputs.json"))["postgresHost"]["value"])')"
           namespace="$(python3 -c 'import json; print(json.load(open("infra-outputs.json"))["serviceBusNamespaceName"]["value"])')"
           bus="$(az servicebus queue authorization-rule keys list --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" --namespace-name "$namespace" --queue-name dispatch --name dispatch-worker --query primaryConnectionString -o tsv)"
-          provider="Fake"
-          if [ -n "$VIETMAP_API_KEY" ] && [ -n "$VIETMAP_TILEMAP_KEY" ]; then
-            provider="VietMap"
-          elif [ -n "$GOOGLE_MAPS_API_KEY" ] && [ -n "$GOOGLE_MAPS_BROWSER_KEY" ]; then
-            provider="Google"
+          provider="${MAPS_PROVIDER:-}"
+          if [ -z "$provider" ]; then
+            provider="Fake"
+            if [ -n "$VIETMAP_API_KEY" ] && [ -n "$VIETMAP_TILEMAP_KEY" ]; then
+              provider="VietMap"
+            elif [ -n "$GOOGLE_MAPS_API_KEY" ] && [ -n "$GOOGLE_MAPS_BROWSER_KEY" ]; then
+              provider="Google"
+            fi
           fi
           az webapp config appsettings set \
             --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
@@ -177,11 +191,14 @@ jobs:
       - name: Deploy the API
         uses: azure/webapps-deploy@v3
         with:
-          app-name: app-grabbike-api
+          app-name: ${{ vars.AZURE_API_APP_NAME || 'app-grabbike-api' }}
           package: publish/api
 
       - name: Accept the current and new Entra identities
         env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          AZURE_WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
           AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
           AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -266,11 +283,13 @@ jobs:
       - name: Deploy the web app
         uses: azure/webapps-deploy@v3
         with:
-          app-name: app-grabbike-web
+          app-name: ${{ vars.AZURE_WEB_APP_NAME || 'app-grabbike-web' }}
           package: web/.next/standalone
 
       - name: Keep only the new Entra identity
         env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
           AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
           AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -310,6 +329,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.meta.outputs.version }}
           SHA: ${{ steps.meta.outputs.sha }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://app-grabbike-api.azurewebsites.net' }}
+          WEB_BASE_URL: ${{ vars.WEB_BASE_URL || 'https://app-grabbike-web.azurewebsites.net' }}
         run: |
           if gh release view "$VERSION" >/dev/null 2>&1; then
             echo "Release $VERSION already exists"
@@ -317,7 +338,7 @@ jobs:
             gh release create "$VERSION" \
               --target "$SHA" \
               --title "$VERSION" \
-              --notes "Production deployment of ${SHA}. API: https://app-grabbike-api.azurewebsites.net Web: https://app-grabbike-web.azurewebsites.net"
+              --notes "Production deployment of ${SHA}. API: ${API_BASE_URL} Web: ${WEB_BASE_URL}"
           fi
 
       - name: Update the version badge
@@ -339,8 +360,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.meta.outputs.version }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://app-grabbike-api.azurewebsites.net' }}
+          WEB_BASE_URL: ${{ vars.WEB_BASE_URL || 'https://app-grabbike-web.azurewebsites.net' }}
         run: |
           for number in $(gh issue list --label deployment-request --state open --json number --jq '.[].number'); do
-            gh issue comment "$number" --body "Deployed ${VERSION}. API: https://app-grabbike-api.azurewebsites.net Web: https://app-grabbike-web.azurewebsites.net"
+            gh issue comment "$number" --body "Deployed ${VERSION}. API: ${API_BASE_URL} Web: ${WEB_BASE_URL}"
             gh issue close "$number" --reason completed
           done
