@@ -17,8 +17,10 @@ public sealed class OfferService(
     IRideRepository rides,
     IDriverRepository drivers,
     IDispatchService dispatch,
+    IDispatchBus dispatchBus,
     IUnitOfWork unitOfWork,
-    IRideWriteLock writeLock) : IOfferService
+    IRideWriteLock writeLock,
+    ILogger<OfferService> logger) : IOfferService
 {
     public async Task<IReadOnlyList<OfferDto>> PendingAsync(Guid driverId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
@@ -105,6 +107,17 @@ public sealed class OfferService(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        foreach (var created in result.Events.OfType<OutboundEvent.OfferReceived>().Select(item => item.Offer).DistinctBy(item => (item.RideId, item.Round)))
+        {
+            try
+            {
+                await dispatchBus.PublishAsync(new DispatchMessage.Requested(created.RideId, created.Round), cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Round {Round} for ride {RideId} was saved but its timeout was not scheduled", created.Round, created.RideId);
+            }
+        }
         return result;
     }
 }
