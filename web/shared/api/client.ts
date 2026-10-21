@@ -44,11 +44,23 @@ let sessionUser: string | null = null;
 
 export async function ensurePersonaSession(userId: string): Promise<void> {
   if (typeof window === "undefined" || sessionUser === userId) return;
-  await fetch("/backend/session", {
+  const response = await fetch("/backend/session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId }),
   });
+  if (!response.ok) {
+    const text = await response.text();
+    let payload: unknown = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text) as unknown;
+      } catch {
+        payload = { error: text };
+      }
+    }
+    throw new ApiError(response.status, payload);
+  }
   sessionUser = userId;
 }
 

@@ -22,6 +22,10 @@ export function isForwardedPath(path: string): boolean {
   return path === "/api" || path.startsWith("/api/") || path === "/hubs" || path.startsWith("/hubs/");
 }
 
+export function allowsAnonymousBootstrap(method: string, path: string): boolean {
+  return method === "GET" && path === "/api/dev/users";
+}
+
 export function forwardedHeaders(incoming: Headers, token: string | null): Headers {
   const headers = new Headers();
   incoming.forEach((value, key) => {
@@ -44,8 +48,8 @@ export async function proxyApi(request: Request, segments: string[]): Promise<Re
   const headers = forwardedHeaders(request.headers, null);
   if (settings) {
     const actor = personaFromCookieHeader(request.headers.get("cookie"), settings.clientSecret);
-    if (!actor) return new Response(null, { status: 401 });
-    headers.set("x-user-id", actor);
+    if (!actor && !allowsAnonymousBootstrap(request.method, path)) return new Response(null, { status: 401 });
+    if (actor) headers.set("x-user-id", actor);
     try {
       token = await appAccessToken(settings);
     } catch {

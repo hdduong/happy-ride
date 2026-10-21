@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { appAccessToken, clearAppTokenCache, settingsFromEnv } from "../shared/api/appToken.ts";
-import { forwardedHeaders, isForwardedPath } from "../shared/api/proxy.ts";
+import { allowsAnonymousBootstrap, forwardedHeaders, isForwardedPath } from "../shared/api/proxy.ts";
 import { openPersona, sealPersona } from "../shared/api/persona.ts";
 
 test("missing Entra settings leave the local demo without a token", () => {
@@ -60,4 +60,11 @@ test("the proxy only forwards API and hub paths", () => {
   assert.equal(isForwardedPath("/api/dev/users"), true);
   assert.equal(isForwardedPath("/hubs/ride/negotiate"), true);
   assert.equal(isForwardedPath("/swagger"), false);
+});
+
+test("only the user list can be read before a persona cookie exists", () => {
+  assert.equal(allowsAnonymousBootstrap("GET", "/api/dev/users"), true);
+  assert.equal(allowsAnonymousBootstrap("POST", "/api/dev/users"), false);
+  assert.equal(allowsAnonymousBootstrap("GET", "/api/rides/current"), false);
+  assert.equal(allowsAnonymousBootstrap("GET", "/hubs/ride"), false);
 });
