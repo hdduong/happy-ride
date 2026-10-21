@@ -1,5 +1,6 @@
 import { HttpTransportType, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
-import { apiBase, ensurePersonaSession } from "@/shared/api/client";
+import { apiBase } from "@/shared/api/client";
+import { ensurePersonaSession } from "@/shared/api/personaSession";
 import { asLocation, asOffer, asOfferClosed, asRide } from "./parse";
 import { openConnection } from "./connectionLifecycle";
 import { observeConnectionActivity } from "./connectionActivity";

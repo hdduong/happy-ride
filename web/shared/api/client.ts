@@ -1,4 +1,5 @@
 import { captureUserId } from "@/features/identity/storage";
+import { ensurePersonaSession, forgetPersonaSession } from "./personaSession";
 import { apiBase } from "./base";
 import { getActivityClient } from "../telemetry/browser";
 import type { Correlation } from "../telemetry/activity";
@@ -40,28 +41,13 @@ type RequestOptions = {
   telemetry?: Correlation;
 };
 
-let sessionUser: string | null = null;
-
-export async function ensurePersonaSession(userId: string): Promise<void> {
-  if (typeof window === "undefined" || sessionUser === userId) return;
-  const response = await fetch("/backend/session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
+async function send(path: string, method: string, headers: Headers, body: string | undefined): Promise<Response> {
+  return fetch(`${apiBase()}${path}`, {
+    method,
+    headers,
+    body,
+    cache: "no-store",
   });
-  if (!response.ok) {
-    const text = await response.text();
-    let payload: unknown = null;
-    if (text) {
-      try {
-        payload = JSON.parse(text) as unknown;
-      } catch {
-        payload = { error: text };
-      }
-    }
-    throw new ApiError(response.status, payload);
-  }
-  sessionUser = userId;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -81,12 +67,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(`${apiBase()}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body,
-    cache: "no-store",
-  });
+  let response = await send(path, options.method ?? "GET", headers, body);
+  if (response.status === 401 && actor) {
+    forgetPersonaSession(actor);
+    await ensurePersonaSession(actor);
+    response = await send(path, options.method ?? "GET", headers, body);
+  }
 
   if (response.status === 204 || response.status === 205) return null as T;
   const text = await response.text();
