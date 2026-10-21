@@ -14,8 +14,6 @@ public sealed class DispatchService(IOfferRepository offers, IDriverRepository d
 {
     private const double DispatchRadiusM = 3000;
     private const int OfferTtlSeconds = 30;
-    private const int MaxOffers = 3;
-    private const int MaxRounds = 3;
 
     public async Task AdvanceAsync(
         Ride ride,
@@ -31,12 +29,6 @@ public sealed class DispatchService(IOfferRepository offers, IDriverRepository d
             return;
 
         var offered = rideOffers.Select(offer => offer.DriverId).ToHashSet();
-        if (rideOffers.Count > 0 && ride.Round >= MaxRounds)
-        {
-            MarkNoDriver(ride, events);
-            return;
-        }
-
         var fleet = await drivers.ListAvailableAsync(cancellationToken);
         var ranked = Rank(fleet, ride.Pickup.Lat, ride.Pickup.Lng, offered);
         if (ranked.Count == 0)
@@ -48,21 +40,18 @@ public sealed class DispatchService(IOfferRepository offers, IDriverRepository d
         if (rideOffers.Count > 0)
             ride.Round++;
 
-        var expiresAt = now.AddSeconds(OfferTtlSeconds);
-        foreach (var (driver, _) in ranked.Take(MaxOffers))
+        var next = ranked[0].Driver;
+        var offer = new Offer
         {
-            var offer = new Offer
-            {
-                Id = Guid.NewGuid(),
-                RideId = ride.Id,
-                DriverId = driver.UserId,
-                Round = ride.Round,
-                Status = OfferStatus.Pending,
-                ExpiresAt = expiresAt,
-            };
-            await offers.AddAsync(offer, cancellationToken);
-            events.Add(new OutboundEvent.OfferReceived(offer.DriverId, OfferMaps.ToOffer(offer, ride, driver)));
-        }
+            Id = Guid.NewGuid(),
+            RideId = ride.Id,
+            DriverId = next.UserId,
+            Round = ride.Round,
+            Status = OfferStatus.Pending,
+            ExpiresAt = now.AddSeconds(OfferTtlSeconds),
+        };
+        await offers.AddAsync(offer, cancellationToken);
+        events.Add(new OutboundEvent.OfferReceived(offer.DriverId, OfferMaps.ToOffer(offer, ride, next)));
 
         events.Add(new OutboundEvent.StatusChanged(RideMaps.ToView(ride, null), ride.RiderId, null));
     }

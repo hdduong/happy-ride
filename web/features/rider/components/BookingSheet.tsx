@@ -105,7 +105,7 @@ export function BookingSheet({ booking, driverLive }: { booking: RiderBooking; d
     sheet = (
       <div className="stack">
         <h1 data-testid="finding-driver">Finding a driver</h1>
-        <p className="muted">Round {ride.round || 1} of 3 · within 3 km</p>
+        <p className="muted">Asking the nearest driver · {ride.round || 1} within 3 km</p>
         <ErrorLine message={error} />
         <TextButton data-testid="cancel-ride" disabled={busy} onClick={() => void onCancel()}>
           Cancel ride
