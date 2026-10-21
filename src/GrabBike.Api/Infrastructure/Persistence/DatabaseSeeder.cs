@@ -18,8 +18,8 @@ public static class DatabaseSeeder
         new("66666666-6666-6666-6666-666666666666", "HCMD04 Driver04", UserRole.Driver, "HCMC", "59-N1 441.07", 10.7690, 106.7000),
         new("77777777-7777-7777-7777-777777777777", "HanoiR01 Rider01", UserRole.Rider, "Hanoi", null, null, null),
         new("88888888-8888-8888-8888-888888888888", "HanoiR02 Rider02", UserRole.Rider, "Hanoi", null, null, null),
-        new("99999999-9999-9999-9999-999999999999", "HanoiD01 Driver01", UserRole.Driver, "Hanoi", "29-H1 100.01", 21.02980, 105.85360),
-        new("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "HanoiD02 Driver02", UserRole.Driver, "Hanoi", "29-P1 200.02", 21.02770, 105.85110),
+        new("99999999-9999-9999-9999-999999999999", "HanoiD01 Driver01", UserRole.Driver, "Hanoi", "29-H1 100.01", 21.0352316, 105.8209560),
+        new("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "HanoiD02 Driver02", UserRole.Driver, "Hanoi", "29-P1 200.02", 21.0303473, 105.8143142),
         new("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "HanoiD03 Driver03", UserRole.Driver, "Hanoi", "29-H1 300.03", 21.03050, 105.85080),
         new("cccccccc-cccc-cccc-cccc-cccccccccccc", "HanoiD04 Driver04", UserRole.Driver, "Hanoi", "29-N1 400.04", 21.02680, 105.85430),
     ];
@@ -44,7 +44,15 @@ public static class DatabaseSeeder
             new Place { Id = "place-ben-thanh", Name = "Chợ Bến Thành", Address = "District 1", Lat = 10.77254, Lng = 106.69800 },
             new Place { Id = "place-notre-dame", Name = "Nhà thờ Đức Bà", Address = "District 1", Lat = 10.77979, Lng = 106.69902 },
             new Place { Id = "place-bitexco", Name = "Bitexco Financial Tower", Address = "2 Hai Trieu, District 1", Lat = 10.77175, Lng = 106.70446 },
-            new Place { Id = "place-hoan-kiem", Name = "Hồ Hoàn Kiếm", Address = "Hanoi", Lat = 21.02870, Lng = 105.85240 });
+            new Place { Id = "place-hoan-kiem", Name = "Hồ Hoàn Kiếm", Address = "Hanoi", Lat = 21.02870, Lng = 105.85240 },
+            new Place
+            {
+                Id = "place-lau-ech-ha-my",
+                Name = "Lẩu Ếch Hà My",
+                Address = "70 Ngõ 36 Giang Văn Minh, Phường Ba Đình, Hà Nội",
+                Lat = 21.03342,
+                Lng = 105.82845,
+            });
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -60,8 +68,23 @@ public static class DatabaseSeeder
             if (person.Role != UserRole.Driver)
                 continue;
             var driver = await db.Drivers.FindAsync([id], cancellationToken);
-            if (driver is not null)
-                driver.Name = person.Name;
+            if (driver is null || person.Lat is not double lat || person.Lng is not double lng)
+                continue;
+            driver.Name = person.Name;
+            driver.Lat = lat;
+            driver.Lng = lng;
+        }
+
+        if (!await db.Places.AnyAsync(place => place.Id == "place-lau-ech-ha-my", cancellationToken))
+        {
+            db.Places.Add(new Place
+            {
+                Id = "place-lau-ech-ha-my",
+                Name = "Lẩu Ếch Hà My",
+                Address = "70 Ngõ 36 Giang Văn Minh, Phường Ba Đình, Hà Nội",
+                Lat = 21.03342,
+                Lng = 105.82845,
+            });
         }
 
         await db.SaveChangesAsync(cancellationToken);

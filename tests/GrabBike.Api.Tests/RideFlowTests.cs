@@ -265,13 +265,13 @@ public class RideFlowTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Hanoi_rider_quote_is_near_Hoan_Kiem()
+    public async Task Hanoi_rider_at_Lau_ech_Ha_My_offers_Doi_Can_before_Kim_Ma()
     {
         await using var fixture = new ApiFactory(Database);
         var quote = await Read(await fixture.Client(Nam).PostAsJsonAsync("/api/quotes", new
         {
-            pickup = new Pin(21.0287, 105.8524, "Hồ Hoàn Kiếm"),
-            dropoff = new Pin(21.0300, 105.8540, "Nearby"),
+            pickup = new Pin(21.03342, 105.82845, "Lẩu Ếch Hà My"),
+            dropoff = new Pin(21.03523, 105.82096, "Phố Đội Cấn"),
         }), HttpStatusCode.Created);
         var created = await Read(await fixture.Client(Nam).PostAsJsonAsync("/api/rides", new
         {

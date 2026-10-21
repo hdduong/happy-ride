@@ -7,4 +7,6 @@ public sealed record DevUserDto(
     string Name,
     string Role,
     string City,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Plate);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Plate,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] double? Lat = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] double? Lng = null);

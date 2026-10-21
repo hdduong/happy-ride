@@ -2,7 +2,7 @@ import { bearing, isPlotted, linePoints } from "@/features/maps/geo";
 import type { MapMarker } from "@/features/maps/MapCanvas";
 import type { DriverDashboard } from "./useDriverDashboard";
 
-export function driverMap({ ride, live, offer, center }: Pick<DriverDashboard, "ride" | "live" | "offer" | "center">) {
+export function driverMap({ ride, live, offer, center, me }: Pick<DriverDashboard, "ride" | "live" | "offer" | "center" | "me">) {
   const driverLive = live && ride && live.rideId === ride.rideId ? live : null;
   const driverPoint = driverLive
     ? { lat: driverLive.lat, lng: driverLive.lng }
@@ -28,6 +28,8 @@ export function driverMap({ ride, live, offer, center }: Pick<DriverDashboard, "
     const heading = driverLive?.heading != null ? driverLive.heading : bearing(driverPoint, target);
     markers.push({ ...driverPoint, kind: "bike", heading });
   }
+  const self = me?.lat != null && me.lng != null ? { lat: me.lat, lng: me.lng } : null;
+  if (!driverPoint && self && isPlotted(self)) markers.push({ ...self, kind: "bike" });
 
-  return { center: pickupPoint && isPlotted(pickupPoint) ? pickupPoint : center, route, markers };
+  return { center: pickupPoint && isPlotted(pickupPoint) ? pickupPoint : self && isPlotted(self) ? self : center, route, markers };
 }
