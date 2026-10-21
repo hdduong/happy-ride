@@ -205,7 +205,11 @@ test("browser lifecycle survives StrictMode and bfcache and rotates sessions on 
   const stored = new Map();
   const events = [];
   Object.assign(globalThis, { document, window,
-    sessionStorage: { getItem: (key) => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) },
+    sessionStorage: {
+      getItem: (key) => stored.get(key) ?? null,
+      setItem: (key, value) => stored.set(key, value),
+      removeItem: (key) => stored.delete(key),
+    },
     fetch: async (url, options) => {
       if (String(url).endsWith("/backend/session")) return { ok: true, status: 204 };
       events.push({ ...JSON.parse(options.body), userId: options.headers["X-User-Id"] });

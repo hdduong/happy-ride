@@ -1,7 +1,16 @@
 const renewWithinMs = 60 * 60 * 1000;
+const disabledKey = "happy-ride-persona-off";
 
 function proofKey(userId: string): string {
   return `happy-ride-persona-proof:${userId.toLowerCase()}`;
+}
+
+function personaOff(): boolean {
+  try {
+    return sessionStorage.getItem(disabledKey) === "1";
+  } catch {
+    return false;
+  }
 }
 
 export function currentPersonaProof(userId: string): string | null {
@@ -17,6 +26,7 @@ export function forgetPersonaSession(userId: string): void {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.removeItem(proofKey(userId));
+    sessionStorage.removeItem(disabledKey);
   } catch {
     /* storage can be denied */
   }
@@ -29,7 +39,7 @@ function proofStillFresh(proof: string, userId: string): boolean {
 }
 
 export async function ensurePersonaSession(userId: string): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || personaOff()) return;
   const existing = currentPersonaProof(userId);
   if (existing && proofStillFresh(existing, userId)) return;
   const response = await fetch("/backend/session", {
@@ -52,10 +62,18 @@ export async function ensurePersonaSession(userId: string): Promise<void> {
       : `Request failed (${response.status})`;
     throw new Error(detail);
   }
-  if (response.status === 204) return;
+  if (response.status === 204) {
+    try {
+      sessionStorage.setItem(disabledKey, "1");
+    } catch {
+      /* the next call can ask again */
+    }
+    return;
+  }
   const body = (await response.json()) as { proof?: unknown };
   if (typeof body.proof !== "string") throw new Error("The persona session was incomplete");
   try {
+    sessionStorage.removeItem(disabledKey);
     sessionStorage.setItem(proofKey(userId), body.proof);
   } catch {
     throw new Error("The persona session could not be stored");

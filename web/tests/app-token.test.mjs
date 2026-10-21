@@ -3,6 +3,7 @@ import test from "node:test";
 import { appAccessToken, clearAppTokenCache, settingsFromEnv } from "../shared/api/appToken.ts";
 import { allowsAnonymousBootstrap, bindPersonaQuery, forwardedHeaders, isForwardedPath } from "../shared/api/proxy.ts";
 import { openPersona, sealPersona } from "../shared/api/persona.ts";
+import { ensurePersonaSession } from "../shared/api/personaSession.ts";
 
 test("missing Entra settings leave the local demo without a token", () => {
   assert.equal(settingsFromEnv({}), null);
@@ -61,6 +62,35 @@ test("the proxy only forwards API and hub paths", () => {
   assert.equal(isForwardedPath("/api/dev/users"), true);
   assert.equal(isForwardedPath("/hubs/ride/negotiate"), true);
   assert.equal(isForwardedPath("/swagger"), false);
+});
+
+test("an open demo asks for a persona proof once", async () => {
+  const originals = Object.getOwnPropertyDescriptors(globalThis);
+  const stored = new Map();
+  let calls = 0;
+  Object.assign(globalThis, {
+    window: globalThis,
+    sessionStorage: {
+      getItem: (key) => stored.get(key) ?? null,
+      setItem: (key, value) => stored.set(key, value),
+      removeItem: (key) => stored.delete(key),
+    },
+    fetch: async () => {
+      calls += 1;
+      return new Response(null, { status: 204 });
+    },
+  });
+  try {
+    const userId = "11111111-1111-1111-1111-111111111111";
+    await ensurePersonaSession(userId);
+    await ensurePersonaSession(userId);
+    assert.equal(calls, 1);
+  } finally {
+    for (const name of ["window", "sessionStorage", "fetch"]) {
+      if (originals[name]) Object.defineProperty(globalThis, name, originals[name]);
+      else delete globalThis[name];
+    }
+  }
 });
 
 test("the hub query keeps the sealed persona and drops any other user id key", () => {
