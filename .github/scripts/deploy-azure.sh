@@ -76,7 +76,7 @@ az webapp config appsettings set \
     WEBSITES_PORT="8080" \
     SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
     ENABLE_ORYX_BUILD="false" \
-    Cors__AllowedOrigins="http://localhost:3000,https://${WEB_APP}.azurewebsites.net" \
+    Cors__AllowedOrigins="${CORS_ALLOWED_ORIGINS:-http://localhost:3000,https://${WEB_APP}.azurewebsites.net}" \
   --output none
 
 bash "$(dirname "${BASH_SOURCE[0]}")/configure-observability.sh"
