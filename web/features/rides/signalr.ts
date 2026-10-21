@@ -1,21 +1,27 @@
-import { HttpTransportType, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
-import { apiBase } from "@/shared/api/client";
+import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
+import { realtimeBase } from "@/shared/api/base";
 import { asLocation, asOffer, asOfferClosed, asRide } from "./parse";
 import { openConnection } from "./connectionLifecycle";
 import { observeConnectionActivity } from "./connectionActivity";
 import type { RideHandlers } from "./session";
 import type { ActivityClient } from "@/shared/telemetry/activity";
 
+async function readRealtimeToken(): Promise<string> {
+  if (typeof window === "undefined") return "";
+  const response = await fetch("/backend/realtime-token");
+  if (!response.ok) return "";
+  const body = (await response.json()) as { token?: string | null };
+  return body.token ?? "";
+}
+
 export function openRideConnection(userId: string, handlers: RideHandlers, activity?: ActivityClient): () => void {
   let lifecycle: ReturnType<typeof observeConnectionActivity>;
   return openConnection((isActive) => {
     const sessionQuery = activity ? `&appSessionId=${encodeURIComponent(activity.appSessionId)}` : "";
     const connection = new HubConnectionBuilder()
-      .withUrl(`${apiBase()}/hubs/ride?userId=${encodeURIComponent(userId)}${sessionQuery}`, {
-        // Long polling is ordinary HTTP, so the Next.js server can add the Entra token.
-        // A browser WebSocket would connect to the API without that server in the middle.
-        transport: HttpTransportType.LongPolling,
+      .withUrl(`${realtimeBase()}/hubs/ride?userId=${encodeURIComponent(userId)}${sessionQuery}`, {
         headers: { "X-User-Id": userId },
+        accessTokenFactory: readRealtimeToken,
       })
       .withAutomaticReconnect()
       .configureLogging({

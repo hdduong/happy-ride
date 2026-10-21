@@ -24,7 +24,7 @@ async function observeActivity(page: Page) {
   page.on('response', (response) => {
     const request = response.request();
     if (request.method() !== 'POST' || !response.ok()) return;
-    const path = new URL(response.url()).pathname;
+    const path = new URL(response.url()).pathname.replace(/^\/backend(?=\/)/, '');
     if (path === '/api/telemetry/activity') {
       events.push(request.postDataJSON() as Activity);
     } else if (path.startsWith('/api/rides') || path.startsWith('/api/offers')) {
