@@ -5,13 +5,14 @@ set -euo pipefail
 
 RG="${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}"
 API_APP="${AZURE_API_APP:-app-grabbike-api}"
+WEB_APP="${AZURE_WEB_APP:-app-grabbike-web}"
 LOCATION="${AZURE_LOCATION:-southeastasia}"
 INSIGHTS="${AZURE_APPLICATION_INSIGHTS:-appi-grabbike-api}"
 WORKSPACE="${AZURE_LOG_ANALYTICS_WORKSPACE:-log-grabbike}"
 RETENTION_DAYS="${AZURE_LOG_RETENTION_DAYS:-30}"
 DAILY_CAP_GB="${AZURE_LOG_DAILY_CAP_GB:-1}"
 
-apply_api_settings() {
+apply_app_settings() {
   local connection_string="$1"
   if [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
     local masked_value="${connection_string//'%'/'%25'}"
@@ -20,15 +21,21 @@ apply_api_settings() {
     printf '::add-mask::%s\n' "$masked_value"
   fi
 
-  # Never echo this value or the settings response. The web app receives no telemetry credentials.
+  # Keep this value in server runtime settings and suppress the settings response.
+  # Each SDK supplies its own service name while exporting to the same resource.
   az webapp config appsettings set --resource-group "$RG" --name "$API_APP" \
     --settings APPLICATIONINSIGHTS_CONNECTION_STRING="$connection_string" \
-      OTEL_SERVICE_NAME="happy-ride-api" --output none
+      OTEL_SERVICE_NAME="happy-ride-api" \
+      ApplicationInsightsAgent_EXTENSION_VERSION="disabled" --output none
+  az webapp config appsettings set --resource-group "$RG" --name "$WEB_APP" \
+    --settings APPLICATIONINSIGHTS_CONNECTION_STRING="$connection_string" \
+      OTEL_SERVICE_NAME="happy-ride-web" \
+      ApplicationInsightsAgent_EXTENSION_VERSION="disabled" --output none
 }
 
 if [ -n "${APPLICATIONINSIGHTS_CONNECTION_STRING:-}" ]; then
-  apply_api_settings "$APPLICATIONINSIGHTS_CONNECTION_STRING"
-  echo "API telemetry configured from the supplied connection string."
+  apply_app_settings "$APPLICATIONINSIGHTS_CONNECTION_STRING"
+  echo "API and Next.js server telemetry configured from the supplied connection string."
   exit 0
 fi
 
@@ -92,6 +99,6 @@ if [ -z "$connection_string" ]; then
   echo "Application Insights returned an empty connection string." >&2
   exit 1
 fi
-apply_api_settings "$connection_string"
+apply_app_settings "$connection_string"
 unset connection_string
-echo "API telemetry configured: $INSIGHTS (workspace: $workspace_id)"
+echo "API and Next.js server telemetry configured: $INSIGHTS (workspace: $workspace_id)"
