@@ -1,24 +1,24 @@
-const proofKey = "happy-ride-persona-proof";
 const renewWithinMs = 60 * 60 * 1000;
 
-export function currentPersonaProof(): string | null {
+function proofKey(userId: string): string {
+  return `happy-ride-persona-proof:${userId.toLowerCase()}`;
+}
+
+export function currentPersonaProof(userId: string): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return sessionStorage.getItem(proofKey);
+    return sessionStorage.getItem(proofKey(userId));
   } catch {
     return null;
   }
 }
 
-export function forgetPersonaSession(userId?: string): void {
+export function forgetPersonaSession(userId: string): void {
   if (typeof window === "undefined") return;
-  const proof = currentPersonaProof();
-  if (!userId || !proof || proof.toLowerCase().startsWith(`${userId.toLowerCase()}.`)) {
-    try {
-      sessionStorage.removeItem(proofKey);
-    } catch {
-      /* storage can be denied */
-    }
+  try {
+    sessionStorage.removeItem(proofKey(userId));
+  } catch {
+    /* storage can be denied */
   }
 }
 
@@ -30,7 +30,7 @@ function proofStillFresh(proof: string, userId: string): boolean {
 
 export async function ensurePersonaSession(userId: string): Promise<void> {
   if (typeof window === "undefined") return;
-  const existing = currentPersonaProof();
+  const existing = currentPersonaProof(userId);
   if (existing && proofStillFresh(existing, userId)) return;
   const response = await fetch("/backend/session", {
     method: "POST",
@@ -56,7 +56,7 @@ export async function ensurePersonaSession(userId: string): Promise<void> {
   const body = (await response.json()) as { proof?: unknown };
   if (typeof body.proof !== "string") throw new Error("The persona session was incomplete");
   try {
-    sessionStorage.setItem(proofKey, body.proof);
+    sessionStorage.setItem(proofKey(userId), body.proof);
   } catch {
     throw new Error("The persona session could not be stored");
   }

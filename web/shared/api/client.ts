@@ -54,7 +54,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const actor = options.userId ?? (typeof window === "undefined" ? null : captureUserId());
   if (actor) await ensurePersonaSession(actor);
   const headers = new Headers();
-  const proof = currentPersonaProof();
+  const proof = actor ? currentPersonaProof(actor) : null;
   if (proof) headers.set("X-Persona", proof);
   if (options.userId) headers.set("X-User-Id", options.userId);
   const telemetry = options.telemetry ?? getActivityClient(options.userId)?.correlation();
@@ -73,7 +73,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (response.status === 401 && actor) {
     forgetPersonaSession(actor);
     await ensurePersonaSession(actor);
-    const renewed = currentPersonaProof();
+    const renewed = currentPersonaProof(actor);
     if (renewed) headers.set("X-Persona", renewed);
     else headers.delete("X-Persona");
     response = await send(path, options.method ?? "GET", headers, body);

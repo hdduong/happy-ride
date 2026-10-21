@@ -29,7 +29,7 @@ async function send(userId: string, activity: Activity): Promise<"sent" | "retry
     };
     if (activity.rideId) headers["X-Ride-Id"] = activity.rideId;
     await ensurePersonaSession(userId);
-    const proof = currentPersonaProof();
+    const proof = currentPersonaProof(userId);
     if (proof) headers["X-Persona"] = proof;
     let response = await fetch(`${apiBase()}/api/telemetry/activity`, {
       method: "POST", keepalive: true, signal: controller.signal,
@@ -39,7 +39,7 @@ async function send(userId: string, activity: Activity): Promise<"sent" | "retry
     if (response.status === 401) {
       forgetPersonaSession(userId);
       await ensurePersonaSession(userId);
-      const renewed = currentPersonaProof();
+      const renewed = currentPersonaProof(userId);
       if (renewed) headers["X-Persona"] = renewed;
       else delete headers["X-Persona"];
       response = await fetch(`${apiBase()}/api/telemetry/activity`, {

@@ -8,12 +8,12 @@ import type { RideHandlers } from "./session";
 import type { ActivityClient } from "@/shared/telemetry/activity";
 
 class PersonaHttpClient extends DefaultHttpClient {
-  public constructor() {
+  public constructor(private readonly userId: string) {
     super(NullLogger.instance);
   }
 
   public send(request: HttpRequest): Promise<HttpResponse> {
-    const proof = currentPersonaProof();
+    const proof = currentPersonaProof(this.userId);
     if (proof) {
       request.headers ??= {};
       request.headers["X-Persona"] = proof;
@@ -32,7 +32,7 @@ export function openRideConnection(userId: string, handlers: RideHandlers, activ
         // A browser WebSocket cannot carry that server-only credential.
         transport: HttpTransportType.LongPolling,
         headers: { "X-User-Id": userId },
-        httpClient: new PersonaHttpClient(),
+        httpClient: new PersonaHttpClient(userId),
       })
       .withAutomaticReconnect()
       .configureLogging({
