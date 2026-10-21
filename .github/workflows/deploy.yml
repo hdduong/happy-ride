@@ -108,6 +108,7 @@ jobs:
         env:
           POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
           AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
           MAPS_PROVIDER: ${{ vars.MAPS_PROVIDER }}
           VIETMAP_API_KEY: ${{ secrets.VIETMAP_API_KEY }}
@@ -123,7 +124,7 @@ jobs:
             --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
             --name grabbike \
             --template-file infra/main.bicep \
-            --parameters postgresAdminPassword="$POSTGRES_ADMIN_PASSWORD" \
+            --parameters postgresAdminPassword="$POSTGRES_ADMIN_PASSWORD" location="${AZURE_LOCATION:-southeastasia}" \
             --query properties.outputs \
             --output json > infra-outputs.json
           host="$(python3 -c 'import json; print(json.load(open("infra-outputs.json"))["postgresHost"]["value"])')"
@@ -171,6 +172,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.meta.outputs.version }}
           SHA: ${{ steps.meta.outputs.sha }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://app-grabbike-api.azurewebsites.net' }}
+          WEB_BASE_URL: ${{ vars.WEB_BASE_URL || 'https://app-grabbike-web.azurewebsites.net' }}
         run: |
           if gh release view "$VERSION" >/dev/null 2>&1; then
             echo "Release $VERSION already exists"
@@ -178,7 +181,7 @@ jobs:
             gh release create "$VERSION" \
               --target "$SHA" \
               --title "$VERSION" \
-              --notes "Production deployment of ${SHA}. API: https://app-grabbike-api.azurewebsites.net Web: https://app-grabbike-web.azurewebsites.net"
+              --notes "Production deployment of ${SHA}. API: ${API_BASE_URL} Web: ${WEB_BASE_URL}"
           fi
 
       - name: Update the version badge
@@ -200,8 +203,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.meta.outputs.version }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://app-grabbike-api.azurewebsites.net' }}
+          WEB_BASE_URL: ${{ vars.WEB_BASE_URL || 'https://app-grabbike-web.azurewebsites.net' }}
         run: |
           for number in $(gh issue list --label deployment-request --state open --json number --jq '.[].number'); do
-            gh issue comment "$number" --body "Deployed ${VERSION}. API: https://app-grabbike-api.azurewebsites.net Web: https://app-grabbike-web.azurewebsites.net"
+            gh issue comment "$number" --body "Deployed ${VERSION}. API: ${API_BASE_URL} Web: ${WEB_BASE_URL}"
             gh issue close "$number" --reason completed
           done
