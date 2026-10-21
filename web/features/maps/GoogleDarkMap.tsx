@@ -9,6 +9,7 @@ export function GoogleDarkMap({
   region,
   language,
   center,
+  zoom = 15,
   route,
   markers,
   pulse,
@@ -17,6 +18,7 @@ export function GoogleDarkMap({
   region: string;
   language: string;
   center: LatLng;
+  zoom?: number;
   route: LatLng[];
   markers: MapMarker[];
   pulse: LatLng | null;
@@ -25,7 +27,7 @@ export function GoogleDarkMap({
     <APIProvider apiKey={apiKey} region={region} language={language}>
       <Map
         defaultCenter={{ lat: center.lat, lng: center.lng }}
-        defaultZoom={15}
+        defaultZoom={zoom}
         colorScheme={ColorScheme.DARK}
         gestureHandling="greedy"
         disableDefaultUI

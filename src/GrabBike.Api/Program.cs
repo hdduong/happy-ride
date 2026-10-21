@@ -33,7 +33,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Happy Ride API",
         Version = "v1",
-        Description = "Seeded rider An Nguyen: 11111111-1111-1111-1111-111111111111. Driver Khoa Pham: 33333333-3333-3333-3333-333333333333. Send the id in the X-User-Id header.",
+        Description = "Seeded rider HCMR01 Rider01: 11111111-1111-1111-1111-111111111111. Driver HCMD01 Driver01: 33333333-3333-3333-3333-333333333333. Send the id in the X-User-Id header.",
     });
     options.AddSecurityDefinition("X-User-Id", new OpenApiSecurityScheme
     {

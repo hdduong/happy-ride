@@ -11,7 +11,7 @@ public enum DriverStatus
 public sealed class Driver
 {
     public required Guid UserId { get; init; }
-    public required string Name { get; init; }
+    public required string Name { get; set; }
     public required string Plate { get; init; }
     public required string City { get; init; }
     public DriverStatus Status { get; set; } = DriverStatus.Online;
