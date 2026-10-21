@@ -2,12 +2,16 @@ import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { apiBase } from "@/shared/api/client";
 import { asLocation, asOffer, asOfferClosed, asRide } from "./parse";
 import { openConnection } from "./connectionLifecycle";
+import { observeConnectionActivity } from "./connectionActivity";
 import type { RideHandlers } from "./session";
+import type { ActivityClient } from "@/shared/telemetry/activity";
 
-export function openRideConnection(userId: string, handlers: RideHandlers): () => void {
+export function openRideConnection(userId: string, handlers: RideHandlers, activity?: ActivityClient): () => void {
+  let lifecycle: ReturnType<typeof observeConnectionActivity>;
   return openConnection((isActive) => {
+    const sessionQuery = activity ? `&appSessionId=${encodeURIComponent(activity.appSessionId)}` : "";
     const connection = new HubConnectionBuilder()
-      .withUrl(`${apiBase()}/hubs/ride?userId=${encodeURIComponent(userId)}`, {
+      .withUrl(`${apiBase()}/hubs/ride?userId=${encodeURIComponent(userId)}${sessionQuery}`, {
         headers: { "X-User-Id": userId },
       })
       .withAutomaticReconnect()
@@ -19,6 +23,8 @@ export function openRideConnection(userId: string, handlers: RideHandlers): () =
         },
       })
       .build();
+
+    lifecycle = observeConnectionActivity(connection, isActive, activity);
 
     function register<T>(event: string, parse: (payload: unknown) => T | null, handle: (value: T) => void) {
       connection.on(event, (payload: unknown) => {
@@ -36,5 +42,5 @@ export function openRideConnection(userId: string, handlers: RideHandlers): () =
       window.dispatchEvent(new Event("happy-ride-map-config"));
     });
     return { connection };
-  }, (error) => console.warn("SignalR connection failed", error));
+  }, () => lifecycle.failed(), () => lifecycle.connected());
 }

@@ -1,6 +1,6 @@
 # Logs and Application Insights
 
-The API writes structured JSON logs to standard output in every environment. When `APPLICATIONINSIGHTS_CONNECTION_STRING` is set, its Azure Monitor OpenTelemetry integration also sends server telemetry to Application Insights. Without that setting, local development and CI use console logging and do not export to Azure. The Next.js app is not instrumented by this change.
+The API writes structured JSON logs to standard output in every environment. When `APPLICATIONINSIGHTS_CONNECTION_STRING` is set, its Azure Monitor OpenTelemetry integration also sends telemetry to Application Insights. Without that setting, local development and CI use console logging and do not export to Azure. Rider and driver browsers report selected activity and connection events to the API, which resolves the user and exports them through the same logger. The browser does not need an Application Insights connection string.
 
 ## Enable Azure telemetry
 
@@ -90,9 +90,68 @@ AppTraces
 | order by TimeGenerated asc
 ```
 
+## Rider and driver activity
+
+The frontend sends a small, typed record to `POST /api/telemetry/activity`. The API validates its identifiers and association with the selected persona, then writes a `ClientActivity` log through the existing Application Insights exporter. This avoids a second exporter and does not expose the API's connection string in the browser. Deploying this version uses the existing `APPLICATIONINSIGHTS_CONNECTION_STRING` setting; no additional Azure resource or frontend secret is required.
+
+| Field | Meaning |
+| --- | --- |
+| `RideId` | Server-generated GUID shared by both participants, HTTP commands, and background ride events. |
+| `AppSessionId` | Browser-generated GUID for a tab/persona session, retained across ordinary reconnects. |
+| `ActivityId` | GUID identifying one action attempt; requested/result events and the API command share it. Other lifecycle events receive their own GUID. |
+| `ActorId`, `ActorRole`, `Username` | Actor GUID, rider/driver role, and display name resolved by the API. The browser does not supply these log fields. |
+| `OfferId` | Existing GUID joining dispatch and driver offer activity. |
+| `TraceId` | Standard W3C distributed trace ID for one request; it is not reformatted as a GUID. |
+| `SignalRConnectionId` | SignalR's opaque connection identifier; it is not a GUID and can change after reconnect. Distinct from Kestrel's transport-level `ConnectionId`. |
+| `Source`, `EventName`, `Action` | Distinguish browser reports from committed server events and identify the activity. |
+
+`X-App-Session-Id` and `X-Activity-Id` carry context on API commands. A supplied ride identifier is association-checked before use in telemetry. The app still uses development persona selection, not production authentication: server lookup prevents arbitrary username text from becoming a log identity but does not turn the demo user ID into a secure login.
+
+Known-user request completion and exception records retain the same actor context. Requests without a resolved user use `Username=anonymous`; background worker scopes use `Username=system`. Neither label represents a human account. Correlation queries use a separate database context so diagnostic lookups cannot preload stale entities into a later ride command.
+
+Recorded browser events cover app open/background/resume/close, ride-context start/end, offer display, action requested/succeeded/failed, and connection connected/reconnecting/reconnected/closed/failed. Actions cover booking, accepting/declining offers, arriving, starting the ride, dropping off, cancelling, and confirming arrival. A booking attempt has no `RideId` until the server creates one; its `ActivityId` links the attempt, API command, and successful result. Browser success means the client received and processed its command response; committed backend events remain the source for business outcomes.
+
+Rider ride context ends at `Completed`, `Cancelled`, or `NoDriver`. Driver detailed ride context ends at `DroppedOff` or an earlier terminal outcome. This does not change the domain: the driver remains assigned until the rider confirms arrival. Final command results retain the original ride identifier even if the screen has already cleared its active context. Driver connections remain available for subsequent rides.
+
+Visibility changes and connection loss do not cancel rides or change driver availability. Server hub callbacks record connect/disconnect events, including a disconnect after SignalR detects abrupt network loss. HTTP polling may continue with the socket down. A disconnect is therefore not labelled an app exit or user inactivity. Browser close delivery is best effort; a killed process can lose its final event. There is no app-inactivity timer or cross-instance presence registry in this change.
+
+Client events use a bounded in-memory queue and best-effort delivery: at most 64 pending events, three delivery attempts per event, and a three-second request timeout. The API accepts at most 4 KiB per event and 120 activity requests per minute per persona per API instance. Exceeding a limit does not rate-limit business commands. Telemetry failures must not fail a ride command. `clientOccurredAt` describes when the browser reported the event, but client clocks are untrusted; the log timestamp records API receipt. No event is generated for each GPS point, render, or reconciliation poll. A server SignalR send is still not proof that a person saw the update; per-message acknowledgements are not added here.
+
+Find the combined rider/driver timeline in the Application Insights **Logs** view:
+
+```kusto
+let rideId = "paste-ride-guid";
+traces
+| where timestamp > ago(24h)
+| where tostring(customDimensions.RideId) == rideId
+| project timestamp,
+    Source = tostring(customDimensions.Source),
+    ActorRole = tostring(customDimensions.ActorRole),
+    Username = tostring(customDimensions.Username),
+    EventName = tostring(customDimensions.EventName),
+    Action = tostring(customDimensions.Action),
+    AppSessionId = tostring(customDimensions.AppSessionId),
+    ActivityId = tostring(customDimensions.ActivityId),
+    SignalRConnectionId = tostring(customDimensions.SignalRConnectionId),
+    message, operation_Id
+| order by timestamp asc
+```
+
+Find one user's activity across rides:
+
+```kusto
+traces
+| where timestamp > ago(24h)
+| where tostring(customDimensions.ActorId) == "paste-user-guid"
+| project timestamp, message, customDimensions, operation_Id
+| order by timestamp asc
+```
+
+Use `customDimensions.Username` to search by display name, or `customDimensions.AppSessionId` for one tab session. Prefer `ActorId` when names are duplicated or changed. For a failed attempt before booking succeeds, query `customDimensions.ActivityId`. In the Log Analytics workspace use `AppTraces`, `TimeGenerated`, and `Properties` instead.
+
 ## Collection, cost, and privacy
 
-- Application code logs route templates and technical identifiers. Do not add request/response bodies, raw queries, credentials, address search text, rider/driver names, or GPS coordinates to diagnostic logs. Avoid placing those values in exception messages. Telemetry is operational data, not a durable ride-event audit store.
+- Application code logs route templates, technical identifiers, and the user-requested `Username` field, resolved from the existing user record's `Name`. This is a display name, not a separate login name. Usernames are personal information and are included in console and Application Insights logs; apply the workspace's access and retention controls accordingly. Do not add request/response bodies, raw queries, credentials, address search text, or GPS coordinates. Avoid placing those values in exception messages. Telemetry is operational data, not a durable ride-event audit store.
 - Application logs default to Information; ASP.NET Core and EF Core logs default to Warning, and hosting request-diagnostic logs are disabled to avoid raw request paths in their scopes. Request telemetry uses route templates and removes URL/query tags. No request bodies are collected by this instrumentation.
 - The demo explicitly uses 100% trace sampling, disables trace-based log sampling, and disables Live Metrics. This favors complete troubleshooting records at the demo's scale, but polling still generates telemetry. It does not guarantee delivery: export failures, ingestion limits, or process shutdown can lose records. Inspect ingestion before increasing verbosity or adding per-position logs. Keep local development and CI connection strings unset.
 - New workspaces use pay-as-you-go `PerGB2018` and a 1 GB/day ingestion cap. This is a safeguard, not a guaranteed spending limit: data can exceed the cap before ingestion stops, and reaching it creates monitoring gaps. Existing Application Insights limits can also affect ingestion. Inspect **Usage and estimated costs**, set a budget/alert appropriate for the project, and review [daily-cap behavior](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/daily-cap).

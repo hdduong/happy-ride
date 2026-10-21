@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using GrabBike.Api.Features.Realtime;
 using GrabBike.Api.SharedKernel;
+using GrabBike.Api.Infrastructure.Observability;
 
 namespace GrabBike.Api.Features.Dispatch;
 
@@ -14,6 +15,7 @@ public sealed class ServiceBusDispatchWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var actorScope = logger.BeginScope(ActorTelemetry.System);
         var queue = configuration["ServiceBus:Queue"] ?? "dispatch";
         var processor = client.CreateProcessor(queue, new ServiceBusProcessorOptions
         {
@@ -51,6 +53,7 @@ public sealed class ServiceBusDispatchWorker(
 
     private async Task HandleAsync(ProcessMessageEventArgs args)
     {
+        using var actorScope = logger.BeginScope(ActorTelemetry.System);
         var message = ServiceBusDispatchBus.FromMessage(args.Message);
         List<OutboundEvent> events;
         if (message is DispatchMessage.Requested)

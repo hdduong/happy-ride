@@ -52,6 +52,8 @@ public sealed class RequestCompletionMiddleware(RequestDelegate next, ILogger<Re
         }
         finally
         {
+            // The identity middleware's inner scope has already unwound here.
+            using var actorScope = logger.BeginScope(ActorTelemetry.From(context));
             var aborted = context.RequestAborted.IsCancellationRequested;
             var status = failedStatus ?? context.Response.StatusCode;
             if (aborted && status < 400)

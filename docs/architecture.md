@@ -14,6 +14,7 @@ src/GrabBike.Api/
     Drivers/     driver state and simulated movement
     Maps/        places, route quotes, fake map behavior
     Dev/         seeded user identity and development endpoints
+    Telemetry/   bounded client activity intake and actor/ride association checks
     Realtime/    notification contracts and realtime integration
   Infrastructure/
     Persistence/ EF context, repository implementations, write serialization
@@ -46,6 +47,7 @@ web/
     identity/         demo user selection and route guard
   shared/
     api/              HTTP transport and common request/error handling
+    telemetry/        app session correlation and bounded activity delivery
     ui/               reusable presentation components
 ```
 
@@ -54,6 +56,8 @@ Route files compose feature entry points. Rider and driver hooks own screen beha
 A poll represents the state when its request began. If a newer event or command changes the session while that request is running, its response must not replace the newer state. Terminal rides and closed offers also need explicit handling to prevent delayed messages from bringing them back. Disposing a screen stops its connection even during connection startup or reconnect and ignores callbacks after disposal.
 
 Feature API modules own their endpoint calls and response parsing. Shared HTTP code knows how to make a request, not how to book or accept a ride. Map components receive display inputs; they do not own ride lifecycle or dispatch decisions.
+
+Shared telemetry plumbing owns browser session identifiers and best-effort delivery to the API. Rider/driver actions and the shared ride session supply explicit activity and ride context; telemetry transport does not infer business actions from URLs. The API resolves display names and validates ride/offer associations before exporting client reports through its existing logger. Connection lifecycle records belong to `Realtime`. Browser reports and connection loss never mutate ride state, and telemetry delivery failures never become ride-command failures. See [observability](observability.md#rider-and-driver-activity) for fields, lifecycle boundaries, and queries.
 
 ## Review and verification
 

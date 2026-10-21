@@ -1,4 +1,5 @@
 using GrabBike.Api.Features.Realtime;
+using GrabBike.Api.Infrastructure.Observability;
 
 namespace GrabBike.Api.Features.Drivers;
 
@@ -11,6 +12,7 @@ public sealed class DriverSimulationWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var actorScope = logger.BeginScope(ActorTelemetry.System);
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         try
         {

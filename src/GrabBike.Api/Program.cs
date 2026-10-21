@@ -16,6 +16,8 @@ using Npgsql;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Azure.Messaging.ServiceBus;
+using GrabBike.Api.Features.Telemetry;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddApplicationObservability();
@@ -88,6 +90,17 @@ builder.Services.AddScoped<IRideRepository, RideRepository>();
 builder.Services.AddScoped<IOfferRepository, OfferRepository>();
 
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ActivityContextResolver>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("client-activity", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Items["CurrentUser"] is User user ? user.Id.ToString("D") : "anonymous",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0,
+        }));
+});
 builder.Services.AddHttpClient<VietMapMapProvider>(client => client.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddHttpClient<GoogleMapProvider>(client => client.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddScoped<FakeMapProvider>();
@@ -155,6 +168,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 app.UseMiddleware<DevIdentityMiddleware>();
+app.UseMiddleware<ActorTelemetryMiddleware>();
+app.UseRateLimiter();
 app.MapHub<RideHub>("/hubs/ride");
 app.MapControllers();
 
