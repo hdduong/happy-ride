@@ -22,6 +22,17 @@ public class EntraTokenTests(PostgresFixture postgres)
     private const string SigningKey = "0123456789abcdef0123456789abcdef";
 
     [Fact]
+    public async Task OpenApi_document_requires_the_bearer_token_with_the_persona_header()
+    {
+        await using var factory = new TokenFactory(postgres.Container.GetConnectionString());
+        var document = await factory.CreateClient().GetStringAsync("/swagger/v1/swagger.json");
+
+        Assert.Contains("\"Bearer\"", document);
+        Assert.Contains("\"scheme\":\"bearer\"", document.Replace(" ", ""));
+        Assert.Contains("\"X-User-Id\"", document);
+    }
+
+    [Fact]
     public async Task Configured_api_rejects_a_call_without_a_bearer_token()
     {
         await using var factory = new TokenFactory(postgres.Container.GetConnectionString());

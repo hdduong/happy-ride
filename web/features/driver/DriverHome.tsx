@@ -12,7 +12,7 @@ export function DriverHome({ userId }: { userId: string }) {
   const map = driverMap(dashboard);
   return (
     <Stage
-      map={<MapCanvas center={map.center} route={map.route} markers={map.markers} />}
+      map={<MapCanvas userId={userId} center={map.center} route={map.route} markers={map.markers} />}
       banner={dashboard.ride ? <RideBanner ride={dashboard.ride} /> : null}
       sheet={<DriverSheet dashboard={dashboard} />}
     />

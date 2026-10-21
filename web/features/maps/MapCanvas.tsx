@@ -11,11 +11,13 @@ export type { MapMarker };
 const darkStyle = "https://tiles.openfreemap.org/styles/dark";
 
 export function MapCanvas({
+  userId,
   center,
   route = [],
   markers = [],
   pulse = null,
 }: {
+  userId: string;
   center: LatLng;
   route?: LatLng[];
   markers?: MapMarker[];
@@ -26,7 +28,7 @@ export function MapCanvas({
   useEffect(() => {
     let cancel = false;
     const load = () => {
-      void getMapConfig()
+      void getMapConfig(userId)
         .then((payload) => {
           if (!cancel) setConfig(payload);
         })
@@ -40,7 +42,7 @@ export function MapCanvas({
       cancel = true;
       window.removeEventListener("happy-ride-map-config", load);
     };
-  }, []);
+  }, [userId]);
 
   if (config?.provider === "Google" && config.browserKey) {
     return (

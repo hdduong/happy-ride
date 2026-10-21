@@ -2,8 +2,8 @@ import { request } from "@/shared/api/client";
 import { asMapConfig, asPlace, asQuote } from "./parse";
 import type { MapClientConfig, Place, PlacePoint, Quote } from "./types";
 
-export async function getMapConfig(): Promise<MapClientConfig> {
-  const payload = await request<unknown>("/api/map-config");
+export async function getMapConfig(userId: string): Promise<MapClientConfig> {
+  const payload = await request<unknown>("/api/map-config", { userId });
   const config = asMapConfig(payload);
   if (!config) throw new Error("Map config was incomplete");
   return config;

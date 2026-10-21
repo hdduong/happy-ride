@@ -1,4 +1,3 @@
-import { captureUserId } from "@/features/identity/storage";
 import { currentPersonaProof, ensurePersonaSession, forgetPersonaSession } from "./personaSession";
 import { apiBase } from "./base";
 import { getActivityClient } from "../telemetry/browser";
@@ -51,7 +50,7 @@ async function send(path: string, method: string, headers: Headers, body: string
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const actor = options.userId ?? (typeof window === "undefined" ? null : captureUserId());
+  const actor = options.userId ?? null;
   if (actor) await ensurePersonaSession(actor);
   const headers = new Headers();
   const proof = actor ? currentPersonaProof(actor) : null;
