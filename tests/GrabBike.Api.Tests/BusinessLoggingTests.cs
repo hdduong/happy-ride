@@ -6,13 +6,14 @@ using GrabBike.Api.Features.Rides;
 using GrabBike.Api.Infrastructure.Persistence;
 using GrabBike.Api.Infrastructure.Persistence.Repositories;
 using GrabBike.Api.SharedKernel;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace GrabBike.Api.Tests;
 
-public sealed class BusinessLoggingTests
+[Collection(PostgresCollection.Name)]
+public sealed class BusinessLoggingTests(PostgresFixture postgres)
 {
     private static readonly Guid RiderId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid DriverId = Guid.Parse("33333333-3333-3333-3333-333333333333");
@@ -21,7 +22,7 @@ public sealed class BusinessLoggingTests
     [Fact]
     public async Task Booking_acceptance_and_completion_logs_describe_already_persisted_state()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres.Container.GetConnectionString());
         fixture.Logs.Observe = fixture.AssertCommitted;
         var rideId = await fixture.BookAsync();
         var offerId = await fixture.OfferForDriverAsync();
@@ -50,7 +51,7 @@ public sealed class BusinessLoggingTests
     [InlineData(true)]
     public async Task Cancellation_logs_previous_status_and_committed_offer_closures(bool accepted)
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres.Container.GetConnectionString());
         var rideId = await fixture.BookAsync();
         var offerId = await fixture.OfferForDriverAsync();
         if (accepted) await fixture.Offers.AcceptAsync(DriverId, offerId, Now);
@@ -81,7 +82,7 @@ public sealed class BusinessLoggingTests
     [Fact]
     public async Task Declining_an_offer_logs_once_and_idempotent_retries_are_quiet()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres.Container.GetConnectionString());
         var rideId = await fixture.BookAsync();
         var offerId = await fixture.OfferForDriverAsync();
         fixture.Logs.Entries.Clear();
@@ -111,7 +112,7 @@ public sealed class BusinessLoggingTests
     [Fact]
     public async Task Expiry_logs_committed_rounds_and_exhaustion_but_idle_ticks_are_quiet()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres.Container.GetConnectionString());
         HashSet<Guid> eligibleDriverIds;
         using (var seeded = fixture.ReadContext())
         {
@@ -203,7 +204,7 @@ public sealed class BusinessLoggingTests
     [InlineData("expire")]
     public async Task Failed_save_never_emits_business_success(string operation)
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres.Container.GetConnectionString());
         var rideId = operation == "book" ? Guid.Empty : await fixture.BookAsync();
         var offerId = rideId == Guid.Empty ? Guid.Empty : await fixture.OfferForDriverAsync();
         if (operation is "arrived" or "complete")
@@ -240,7 +241,7 @@ public sealed class BusinessLoggingTests
     [Fact]
     public async Task Expected_rejections_emit_neither_success_nor_error_logs()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres.Container.GetConnectionString());
         var rideId = await fixture.BookAsync();
         var offerId = await fixture.OfferForDriverAsync();
         fixture.Logs.Entries.Clear();
@@ -261,7 +262,7 @@ public sealed class BusinessLoggingTests
     [Fact]
     public async Task Notification_failures_include_identifiers_and_exception_without_payloads()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres.Container.GetConnectionString());
         var created = Assert.IsType<RideOutcome.Created>(await fixture.Rides.CreateAsync(RiderId, fixture.QuoteId, Now));
         var received = created.Events.OfType<OutboundEvent.OfferReceived>().First();
         var changed = created.Events.OfType<OutboundEvent.StatusChanged>().Single();
@@ -319,7 +320,9 @@ public sealed class BusinessLoggingTests
 
     private sealed class Fixture : IAsyncDisposable
     {
-        private readonly SqliteConnection _connection = new("Data Source=:memory:");
+        private readonly string _adminConnection;
+        private readonly string _databaseName;
+        private readonly string _connectionString;
         private DbContextOptions<AppDbContext> _options = null!;
         private AppDbContext _db = null!;
         public CapturedLogs Logs { get; } = new();
@@ -329,11 +332,33 @@ public sealed class BusinessLoggingTests
         public DispatchExpiryService Expiry { get; private set; } = null!;
         public Guid QuoteId { get; } = Guid.NewGuid();
 
-        public static async Task<Fixture> CreateAsync()
+        private Fixture(string adminConnection)
         {
-            var fixture = new Fixture();
-            await fixture._connection.OpenAsync();
-            fixture._options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(fixture._connection).Options;
+            _adminConnection = adminConnection;
+            _databaseName = "hr" + Guid.NewGuid().ToString("N");
+            _connectionString = new NpgsqlConnectionStringBuilder(adminConnection) { Database = _databaseName }.ConnectionString;
+        }
+
+        public static async Task<Fixture> CreateAsync(string adminConnection)
+        {
+            var fixture = new Fixture(adminConnection);
+            await using (var admin = new NpgsqlConnection(fixture._adminConnection))
+            {
+                await admin.OpenAsync();
+                await using var create = new NpgsqlCommand($"CREATE DATABASE \"{fixture._databaseName}\"", admin);
+                await create.ExecuteNonQueryAsync();
+            }
+
+            await using (var database = new NpgsqlConnection(fixture._connectionString))
+            {
+                await database.OpenAsync();
+                await using var extension = new NpgsqlCommand("CREATE EXTENSION IF NOT EXISTS postgis", database);
+                await extension.ExecuteNonQueryAsync();
+            }
+
+            fixture._options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(fixture._connectionString, npgsql => npgsql.UseNetTopologySuite())
+                .Options;
             fixture._db = new AppDbContext(fixture._options);
             await fixture._db.Database.EnsureCreatedAsync();
             await DatabaseSeeder.SeedAsync(fixture._db);
@@ -351,9 +376,21 @@ public sealed class BusinessLoggingTests
             var dispatch = new DispatchService(offers, drivers);
             var writeLock = new RideWriteLock();
             fixture.UnitOfWork = new SavingUnitOfWork(fixture._db);
-            fixture.Rides = new RideService(new QuoteRepository(fixture._db), rides, offers, drivers, dispatch,
+            var bus = new InlineDispatchBus(async (message, cancellationToken) =>
+            {
+                if (message is not DispatchMessage.Requested requested)
+                    return [];
+                var ride = await rides.FindAsync(requested.RideId, cancellationToken);
+                if (ride is null)
+                    return [];
+                var events = new List<OutboundEvent>();
+                await dispatch.AdvanceAsync(ride, Now, events, cancellationToken);
+                await fixture.UnitOfWork.SaveChangesAsync(cancellationToken);
+                return events;
+            });
+            fixture.Rides = new RideService(new QuoteRepository(fixture._db), rides, offers, drivers, bus,
                 fixture.UnitOfWork, writeLock, fixture.Logs.Logger<RideService>());
-            fixture.Offers = new OfferService(offers, rides, drivers, dispatch, fixture.UnitOfWork, writeLock,
+            fixture.Offers = new OfferService(offers, rides, drivers, dispatch, bus, fixture.UnitOfWork, writeLock,
                 fixture.Logs.Logger<OfferService>());
             fixture.Expiry = new DispatchExpiryService(offers, rides, dispatch, fixture.UnitOfWork, writeLock,
                 fixture.Logs.Logger<DispatchExpiryService>());
@@ -398,8 +435,33 @@ public sealed class BusinessLoggingTests
         public async ValueTask DisposeAsync()
         {
             await _db.DisposeAsync();
-            await _connection.DisposeAsync();
+            try
+            {
+                await using var admin = new NpgsqlConnection(_adminConnection);
+                await admin.OpenAsync();
+                await using (var terminate = new NpgsqlCommand(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = @name AND pid <> pg_backend_pid()",
+                    admin))
+                {
+                    terminate.Parameters.AddWithValue("name", _databaseName);
+                    await terminate.ExecuteNonQueryAsync();
+                }
+
+                await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_databaseName}\"", admin);
+                await drop.ExecuteNonQueryAsync();
+            }
+            catch (NpgsqlException)
+            {
+            }
         }
+    }
+
+    private sealed class InlineDispatchBus(Func<DispatchMessage, CancellationToken, Task<IReadOnlyList<OutboundEvent>>> publish) : IDispatchBus
+    {
+        public string Mode => "InMemory";
+
+        public Task<IReadOnlyList<OutboundEvent>> PublishAsync(DispatchMessage message, CancellationToken cancellationToken = default) =>
+            publish(message, cancellationToken);
     }
 
     private sealed class SavingUnitOfWork(AppDbContext db) : IUnitOfWork

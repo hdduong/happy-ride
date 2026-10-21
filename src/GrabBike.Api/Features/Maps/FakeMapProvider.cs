@@ -5,7 +5,7 @@ namespace GrabBike.Api.Features.Maps;
 /// <summary>Seeded places and deterministic routes for the two-browser demo.</summary>
 public sealed class FakeMapProvider(IPlaceRepository places) : IMapProvider
 {
-    public MapConfiguration Configuration { get; } = new("Fake", "dark");
+    public MapConfiguration Configuration { get; } = new("Fake", "dark", MapStyles.Dark);
 
     public async Task<IReadOnlyList<PlaceDto>> AutocompleteAsync(
         string? query,

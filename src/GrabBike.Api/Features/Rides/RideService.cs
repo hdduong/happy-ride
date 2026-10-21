@@ -23,7 +23,7 @@ public sealed class RideService(
     IRideRepository rides,
     IOfferRepository offers,
     IDriverRepository drivers,
-    IDispatchService dispatch,
+    IDispatchBus dispatchBus,
     IUnitOfWork unitOfWork,
     IRideWriteLock writeLock,
     ILogger<RideService> logger) : IRideService
@@ -55,10 +55,18 @@ public sealed class RideService(
             CreatedAt = now.UtcTicks,
         };
         await rides.AddAsync(ride, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var result = new RideOutcome.Created(new CreatedRideDto(ride.Id));
-        await dispatch.AdvanceAsync(ride, now, result.Events, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            var dispatched = await dispatchBus.PublishAsync(new DispatchMessage.Requested(ride.Id, ride.Round), cancellationToken);
+            result.Events.AddRange(dispatched);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Ride {RideId} was saved but dispatch was not published", ride.Id);
+        }
         logger.LogInformation(new EventId(2000, "RideBooked"),
             "Ride {RideId} booked with status {Status}", ride.Id, ride.Status.ToString());
         DispatchLogging.Committed(logger, result.Events);

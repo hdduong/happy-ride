@@ -2,7 +2,21 @@ using GrabBike.Api.SharedKernel;
 
 namespace GrabBike.Api.Features.Maps;
 
-public sealed record MapConfiguration(string Provider, string Style);
+public sealed record MapConfiguration(
+    string Provider,
+    string Style,
+    string? StyleUrl = null,
+    string? BrowserKey = null,
+    string Region = "VN",
+    string Language = "vi");
+
+public static class MapStyles
+{
+    public const string Dark = "https://tiles.openfreemap.org/styles/dark";
+
+    public static string VietMapDark(string tileKey) =>
+        $"https://maps.vietmap.vn/maps/styles/dm/style.json?apikey={Uri.EscapeDataString(tileKey)}";
+}
 public sealed record MapRoute(int DistanceM, int DurationS, GeoRoute Geometry);
 
 public interface IMapProvider

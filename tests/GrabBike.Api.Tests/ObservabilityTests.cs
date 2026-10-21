@@ -24,7 +24,8 @@ using OpenTelemetry.Trace;
 
 namespace GrabBike.Api.Tests;
 
-public sealed class ObservabilityTests
+[Collection(PostgresCollection.Name)]
+public sealed class ObservabilityTests(PostgresFixture postgres)
 {
     private const string Rider = "11111111-1111-1111-1111-111111111111";
     private const string Sensitive = "PRIVATE-request-marker";
@@ -36,7 +37,7 @@ public sealed class ObservabilityTests
     [InlineData("/missing/PRIVATE-request-marker", false, 404, "(unmatched)")]
     public async Task Completion_logs_safe_route_status_and_matching_trace(string path, bool authenticated, int status, string route)
     {
-        await using var factory = new ObservabilityFactory();
+        await using var factory = new ObservabilityFactory(postgres.Container.GetConnectionString());
         using var client = factory.CreateClient();
         Assert.False(factory.Services.GetRequiredService<ILoggerFactory>()
             .CreateLogger("Microsoft.AspNetCore.Hosting.Diagnostics").IsEnabled(LogLevel.Critical),
@@ -65,7 +66,7 @@ public sealed class ObservabilityTests
     [Fact]
     public async Task Invalid_body_keeps_existing_400_without_logging_body_or_headers()
     {
-        await using var factory = new ObservabilityFactory();
+        await using var factory = new ObservabilityFactory(postgres.Container.GetConnectionString());
         using var client = factory.CreateClient();
         factory.Logs.Entries.Clear();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/quotes")
@@ -88,7 +89,7 @@ public sealed class ObservabilityTests
     [Fact]
     public async Task Unexpected_failure_returns_safe_problem_with_matching_trace_and_one_exception_log()
     {
-        await using var factory = new ObservabilityFactory();
+        await using var factory = new ObservabilityFactory(postgres.Container.GetConnectionString());
         using var client = factory.CreateClient();
         factory.Logs.Entries.Clear();
         using var request = new HttpRequestMessage(HttpMethod.Post, $"/observability-test/failure/{Sensitive}?token={Sensitive}")
@@ -126,7 +127,7 @@ public sealed class ObservabilityTests
     [InlineData(false, 500, 1)]
     public async Task Cancellation_is_499_only_when_the_request_is_actually_aborted(bool aborted, int expectedStatus, int exceptionCount)
     {
-        await using var factory = new ObservabilityFactory();
+        await using var factory = new ObservabilityFactory(postgres.Container.GetConnectionString());
         using var client = factory.CreateClient();
         factory.Logs.Entries.Clear();
         var pipeline = new ApplicationBuilder(factory.Services);
@@ -242,21 +243,36 @@ public sealed class ObservabilityTests
 
     private sealed class ObservabilityFactory : WebApplicationFactory<Program>
     {
-        private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"happy-ride-observability-{Guid.NewGuid():N}.db");
+        private readonly string _adminConnection;
+        private readonly string _databaseName;
+        private readonly string _connectionString;
         public CapturedLogs Logs { get; } = new();
+
+        public ObservabilityFactory(string adminConnection)
+        {
+            _adminConnection = adminConnection;
+            _databaseName = "hr" + Guid.NewGuid().ToString("N");
+            _connectionString = new Npgsql.NpgsqlConnectionStringBuilder(adminConnection) { Database = _databaseName }.ConnectionString;
+            using var connection = new Npgsql.NpgsqlConnection(adminConnection);
+            connection.Open();
+            using var command = new Npgsql.NpgsqlCommand($"CREATE DATABASE \"{_databaseName}\"", connection);
+            command.ExecuteNonQuery();
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Production");
             builder.UseSetting("APPLICATIONINSIGHTS_CONNECTION_STRING", "");
-            builder.UseSetting("ConnectionStrings:GrabBike", $"Data Source={_databasePath}");
+            builder.UseSetting("ConnectionStrings:GrabBike", _connectionString);
+            builder.UseSetting("Dispatch:Bus", "InMemory");
             builder.ConfigureLogging(logging => logging.AddProvider(Logs));
             builder.ConfigureServices(services =>
             {
                 services.AddControllers().AddApplicationPart(typeof(ObservabilityTestController).Assembly);
                 foreach (var descriptor in services.Where(descriptor =>
                     descriptor.ImplementationType == typeof(DriverSimulationWorker) ||
-                    descriptor.ImplementationType == typeof(DispatchExpiryWorker)).ToArray())
+                    descriptor.ImplementationType == typeof(DispatchExpiryWorker) ||
+                    descriptor.ImplementationType == typeof(ServiceBusDispatchWorker)).ToArray())
                     services.Remove(descriptor);
             });
         }
@@ -264,8 +280,23 @@ public sealed class ObservabilityTests
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
-            try { File.Delete(_databasePath); }
-            catch (IOException) { }
+            try
+            {
+                using var connection = new Npgsql.NpgsqlConnection(_adminConnection);
+                connection.Open();
+                using (var terminate = new Npgsql.NpgsqlCommand(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = @name AND pid <> pg_backend_pid()",
+                    connection))
+                {
+                    terminate.Parameters.AddWithValue("name", _databaseName);
+                    terminate.ExecuteNonQuery();
+                }
+                using var drop = new Npgsql.NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_databaseName}\"", connection);
+                drop.ExecuteNonQuery();
+            }
+            catch (Npgsql.NpgsqlException)
+            {
+            }
         }
     }
 

@@ -29,7 +29,7 @@ public sealed class DispatchService(IOfferRepository offers, IDriverRepository d
             return;
 
         var offered = rideOffers.Select(offer => offer.DriverId).ToHashSet();
-        var fleet = await drivers.ListAvailableAsync(cancellationToken);
+        var fleet = await drivers.ListNearbyAsync(ride.Pickup.Lat, ride.Pickup.Lng, DispatchRadiusM, cancellationToken);
         var ranked = Rank(fleet, ride.Pickup.Lat, ride.Pickup.Lng, offered);
         if (ranked.Count == 0)
         {

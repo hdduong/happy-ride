@@ -3,6 +3,11 @@ export type LatLng = {
   lng: number;
 };
 
+export type MapMarker = LatLng & {
+  kind: "pickup" | "dropoff" | "bike";
+  heading?: number;
+};
+
 export type PlacePoint = LatLng & {
   address: string;
 };
@@ -18,6 +23,14 @@ export type Place = {
 export type GeoLine = {
   type: "LineString";
   coordinates: number[][];
+};
+
+export type MapClientConfig = {
+  provider: string;
+  styleUrl: string | null;
+  browserKey: string | null;
+  region: string;
+  language: string;
 };
 
 export type Quote = {

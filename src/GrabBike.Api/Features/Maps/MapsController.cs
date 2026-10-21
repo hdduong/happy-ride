@@ -4,7 +4,7 @@ namespace GrabBike.Api.Features.Maps;
 
 [ApiController]
 [Route("api")]
-public sealed class MapsController(IMapService maps) : ControllerBase
+public sealed class MapsController(IMapService maps, IMapProviderResolver providers, IMapConfigPublisher publisher) : ControllerBase
 {
     [HttpGet("map-config")]
     public IActionResult Config() => Ok(maps.Configuration);
@@ -40,4 +40,21 @@ public sealed class MapsController(IMapService maps) : ControllerBase
         var quote = await maps.CreateQuoteAsync(body.Pickup, body.Dropoff, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, quote);
     }
+
+    [HttpPost("dev/map-provider")]
+    public async Task<IActionResult> SelectProvider([FromBody] MapProviderRequest? body, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(body?.Provider))
+            return BadRequest();
+        var error = providers.TrySelect(body.Provider);
+        if (error is not null)
+            return Conflict(new { error });
+        await publisher.ChangedAsync(maps.Configuration, cancellationToken);
+        return Ok(maps.Configuration);
+    }
+}
+
+public sealed class MapProviderRequest
+{
+    public string? Provider { get; set; }
 }

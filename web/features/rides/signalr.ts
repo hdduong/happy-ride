@@ -31,6 +31,10 @@ export function openRideConnection(userId: string, handlers: RideHandlers): () =
     register("DriverLocation", asLocation, handlers.onLocation);
     register("OfferReceived", asOffer, handlers.onOffer);
     register("OfferClosed", asOfferClosed, handlers.onOfferClosed);
+    connection.on("MapConfigChanged", () => {
+      if (!isActive()) return;
+      window.dispatchEvent(new Event("happy-ride-map-config"));
+    });
     return { connection };
   }, (error) => console.warn("SignalR connection failed", error));
 }

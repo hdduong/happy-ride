@@ -1,5 +1,19 @@
 import { record, str, num } from "@/shared/api/parse";
-import type { GeoLine, Place, PlacePoint, Quote } from "./types";
+import type { GeoLine, MapClientConfig, Place, PlacePoint, Quote } from "./types";
+
+export function asMapConfig(value: unknown): MapClientConfig | null {
+  const row = record(value);
+  if (!row) return null;
+  const provider = str(row, "provider", "Provider");
+  if (!provider) return null;
+  return {
+    provider,
+    styleUrl: str(row, "styleUrl", "StyleUrl"),
+    browserKey: str(row, "browserKey", "BrowserKey"),
+    region: str(row, "region", "Region") ?? "VN",
+    language: str(row, "language", "Language") ?? "vi",
+  };
+}
 
 export function asPoint(value: unknown): PlacePoint | null {
   const row = record(value);

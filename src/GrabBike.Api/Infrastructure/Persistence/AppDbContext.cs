@@ -6,6 +6,7 @@ using GrabBike.Api.Features.Maps;
 using GrabBike.Api.Features.Rides;
 using GrabBike.Api.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 
 namespace GrabBike.Api.Infrastructure.Persistence;
 
@@ -38,6 +39,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(driver => driver.Name).HasMaxLength(120);
             entity.Property(driver => driver.Plate).HasMaxLength(32);
             entity.Property(driver => driver.City).HasMaxLength(40);
+            entity.Property(driver => driver.Position).HasColumnType("geography(point,4326)");
             entity.HasOne<User>().WithOne().HasForeignKey<Driver>(driver => driver.UserId);
         });
 
@@ -79,4 +81,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         });
     }
 
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        SyncDriverPositions();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        SyncDriverPositions();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void SyncDriverPositions()
+    {
+        foreach (var entry in ChangeTracker.Entries<Driver>())
+        {
+            if (entry.State is EntityState.Added or EntityState.Modified)
+                entry.Entity.Position = new Point(entry.Entity.Lng, entry.Entity.Lat) { SRID = 4326 };
+        }
+    }
 }

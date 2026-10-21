@@ -10,8 +10,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GrabBike.Api.Tests;
 
-public class RideFlowTests
+[Collection(PostgresCollection.Name)]
+public class RideFlowTests(PostgresFixture postgres)
 {
+    private string Database => postgres.Container.GetConnectionString();
     private const string An = "11111111-1111-1111-1111-111111111111";
     private const string Khoa = "33333333-3333-3333-3333-333333333333";
     private const string Linh = "44444444-4444-4444-4444-444444444444";
@@ -25,7 +27,7 @@ public class RideFlowTests
     [Fact]
     public async Task OpenApi_document_feeds_swagger_and_scalar()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var client = fixture.CreateClient();
 
         var document = await client.GetStringAsync("/swagger/v1/swagger.json");
@@ -49,7 +51,7 @@ public class RideFlowTests
     [Fact]
     public async Task Quote_for_Ben_Thanh_to_Bitexco_returns_distance_fare_and_route()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var response = await fixture.Client(An).PostAsJsonAsync("/api/quotes", new
         {
             pickup = BenThanh,
@@ -84,7 +86,7 @@ public class RideFlowTests
     [Fact]
     public async Task Post_ride_as_An_creates_Searching_and_offers_Khoa_and_others()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var rideId = await CreateRide(fixture.Client(An));
 
         var ride = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
@@ -112,7 +114,7 @@ public class RideFlowTests
     [Fact]
     public async Task Two_concurrent_accepts_yield_one_success_and_one_conflict()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var rideId = await CreateRide(fixture.Client(An));
         var khoaOffer = await PendingOffer(fixture.Client(Khoa), rideId);
 
@@ -135,7 +137,7 @@ public class RideFlowTests
     [Fact]
     public async Task Happy_path_completes_and_returns_driver_online()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var an = fixture.Client(An);
         var khoa = fixture.Client(Khoa);
         var rideId = await CreateRide(an);
@@ -172,7 +174,7 @@ public class RideFlowTests
     [Fact]
     public async Task Confirm_before_dropoff_returns_invalid_transition()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var an = fixture.Client(An);
         var khoa = fixture.Client(Khoa);
         var rideId = await CreateRide(an);
@@ -192,7 +194,7 @@ public class RideFlowTests
     [Fact]
     public async Task Second_ride_while_one_is_active_is_rejected()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var an = fixture.Client(An);
         var rideId = await CreateRide(an);
         var quote = await Read(await an.PostAsJsonAsync("/api/quotes", new
@@ -215,7 +217,7 @@ public class RideFlowTests
     [Fact]
     public async Task Ride_outside_every_cluster_becomes_NoDriver()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var quote = await Read(await fixture.Client(An).PostAsJsonAsync("/api/quotes", new
         {
             pickup = new Pin(16.047, 108.206, "Da Nang"),
@@ -238,7 +240,7 @@ public class RideFlowTests
     [Fact]
     public async Task Declining_the_first_round_offers_the_remaining_driver()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var rideId = await CreateRide(fixture.Client(An));
         var queue = new[] { Khoa, Linh, Duc, Ha };
         for (var index = 0; index < queue.Length - 1; index++)
@@ -261,7 +263,7 @@ public class RideFlowTests
     [Fact]
     public async Task Hanoi_rider_quote_is_near_Hoan_Kiem()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var quote = await Read(await fixture.Client(Nam).PostAsJsonAsync("/api/quotes", new
         {
             pickup = new Pin(21.0287, 105.8524, "Hồ Hoàn Kiếm"),
@@ -284,7 +286,7 @@ public class RideFlowTests
     public async Task Failed_notifications_do_not_turn_a_committed_create_into_an_HTTP_failure()
     {
         var publisher = new FailingPublisher();
-        await using var fixture = new ApiFactory(publisher);
+        await using var fixture = new ApiFactory(Database, publisher);
 
         var rideId = await CreateRide(fixture.Client(An));
 
@@ -299,7 +301,7 @@ public class RideFlowTests
     public async Task Failed_notifications_do_not_turn_a_committed_accept_into_an_HTTP_failure()
     {
         var publisher = new FailingPublisher();
-        await using var fixture = new ApiFactory(publisher);
+        await using var fixture = new ApiFactory(Database, publisher);
         var rideId = await CreateRide(fixture.Client(An));
         var offerId = await PendingOffer(fixture.Client(Khoa), rideId);
         var attemptsBeforeAccept = publisher.Attempts;
@@ -320,7 +322,7 @@ public class RideFlowTests
     [Fact]
     public async Task Dispatch_expiry_advances_rounds_without_running_driver_simulation()
     {
-        await using var fixture = new ApiFactory();
+        await using var fixture = new ApiFactory(Database);
         var rideId = await CreateRide(fixture.Client(An));
         var firstExpiry = DateTimeOffset.UtcNow.AddSeconds(31);
 
@@ -423,9 +425,24 @@ public class RideFlowTests
         }
     }
 
-    private sealed class ApiFactory(IRideEventPublisher? publisher = null) : WebApplicationFactory<Program>
+    private sealed class ApiFactory : WebApplicationFactory<Program>
     {
-        private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"happy-ride-{Guid.NewGuid():N}.db");
+        private readonly string _adminConnection;
+        private readonly string _databaseName;
+        private readonly string _connectionString;
+        private readonly IRideEventPublisher? _publisher;
+
+        public ApiFactory(string adminConnection, IRideEventPublisher? publisher = null)
+        {
+            _adminConnection = adminConnection;
+            _publisher = publisher;
+            _databaseName = "hr" + Guid.NewGuid().ToString("N");
+            _connectionString = new Npgsql.NpgsqlConnectionStringBuilder(adminConnection) { Database = _databaseName }.ConnectionString;
+            using var connection = new Npgsql.NpgsqlConnection(adminConnection);
+            connection.Open();
+            using var command = new Npgsql.NpgsqlCommand($"CREATE DATABASE \"{_databaseName}\"", connection);
+            command.ExecuteNonQuery();
+        }
 
         public HttpClient Client(string userId)
         {
@@ -437,13 +454,14 @@ public class RideFlowTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("APPLICATIONINSIGHTS_CONNECTION_STRING", "");
-            builder.UseSetting("ConnectionStrings:GrabBike", $"Data Source={_databasePath}");
-            if (publisher is not null)
+            builder.UseSetting("ConnectionStrings:GrabBike", _connectionString);
+            builder.UseSetting("Dispatch:Bus", "InMemory");
+            if (_publisher is not null)
             {
                 builder.ConfigureServices(services =>
                 {
                     services.RemoveAll<IRideEventPublisher>();
-                    services.AddSingleton(publisher);
+                    services.AddSingleton(_publisher);
                 });
             }
         }
@@ -453,10 +471,19 @@ public class RideFlowTests
             base.Dispose(disposing);
             try
             {
-                if (File.Exists(_databasePath))
-                    File.Delete(_databasePath);
+                using var connection = new Npgsql.NpgsqlConnection(_adminConnection);
+                connection.Open();
+                using (var terminate = new Npgsql.NpgsqlCommand(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = @name AND pid <> pg_backend_pid()",
+                    connection))
+                {
+                    terminate.Parameters.AddWithValue("name", _databaseName);
+                    terminate.ExecuteNonQuery();
+                }
+                using var drop = new Npgsql.NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_databaseName}\"", connection);
+                drop.ExecuteNonQuery();
             }
-            catch (IOException)
+            catch (Npgsql.NpgsqlException)
             {
             }
         }
