@@ -105,6 +105,11 @@ jobs:
           VIETMAP_TILEMAP_KEY: ${{ secrets.VIETMAP_TILEMAP_KEY }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           GOOGLE_MAPS_BROWSER_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_API_SCOPE: ${{ vars.AZURE_API_SCOPE }}
         run: |
           if [ -z "$POSTGRES_ADMIN_PASSWORD" ]; then
             echo "POSTGRES_ADMIN_PASSWORD is not set. The API requires Azure Postgres, so deployment stops here."
@@ -140,6 +145,28 @@ jobs:
               Maps__Google__ApiKey="$GOOGLE_MAPS_API_KEY" \
               Maps__Google__BrowserKey="$GOOGLE_MAPS_BROWSER_KEY" \
               Sim__Enabled="true"
+          if [ -n "${AZURE_TENANT_ID:-}" ] && [ -n "${AZURE_API_CLIENT_ID:-}" ] && [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
+            client_id="${AZURE_CLIENT_ID:-$AZURE_API_CLIENT_ID}"
+            az webapp config appsettings set \
+              --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+              --name "${AZURE_API_APP:-app-grabbike-api}" \
+              --settings \
+                AzureAd__TenantId="$AZURE_TENANT_ID" \
+                AzureAd__ClientId="$AZURE_API_CLIENT_ID" \
+                AzureAd__Audience="api://${AZURE_API_CLIENT_ID}" \
+                AzureAd__AllowedClientId="$client_id"
+            az webapp config appsettings set \
+              --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+              --name "${AZURE_WEB_APP:-app-grabbike-web}" \
+              --settings \
+                AZURE_TENANT_ID="$AZURE_TENANT_ID" \
+                AZURE_CLIENT_ID="$client_id" \
+                AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET" \
+                AZURE_API_CLIENT_ID="$AZURE_API_CLIENT_ID" \
+                AZURE_API_SCOPE="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
+          else
+            echo "Entra application token is not configured. The API remains open until AZURE_TENANT_ID, AZURE_API_CLIENT_ID, and AZURE_CLIENT_SECRET are set."
+          fi
           rm -f infra-outputs.json
 
       - name: Deploy the API

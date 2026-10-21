@@ -46,7 +46,7 @@ export default defineConfig({
       command: `npm exec -- next dev --port ${webPort}`,
       cwd: '../web',
       url: webUrl,
-      env: { NEXT_PUBLIC_API_BASE_URL: apiUrl },
+      env: { API_BASE_URL: apiUrl, NEXT_PUBLIC_API_BASE_URL: apiUrl },
       name: 'web',
       reuseExistingServer: reuseDevServers,
       timeout: 300000,

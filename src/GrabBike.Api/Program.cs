@@ -6,6 +6,7 @@ using GrabBike.Api.Features.Drivers;
 using GrabBike.Api.Features.Maps;
 using GrabBike.Api.Features.Realtime;
 using GrabBike.Api.Features.Rides;
+using GrabBike.Api.Infrastructure.Auth;
 using GrabBike.Api.Infrastructure.Observability;
 using GrabBike.Api.Infrastructure.Persistence;
 using GrabBike.Api.Infrastructure.Persistence.Repositories;
@@ -65,6 +66,8 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
+
+builder.AddEntraApiTokens();
 
 builder.Services.AddSignalR().AddJsonProtocol(options =>
 {
@@ -154,6 +157,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseEntraApiTokens();
 app.UseMiddleware<DevIdentityMiddleware>();
 app.MapHub<RideHub>("/hubs/ride");
 app.MapControllers();

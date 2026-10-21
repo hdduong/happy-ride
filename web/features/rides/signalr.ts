@@ -1,4 +1,4 @@
-import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
+import { HttpTransportType, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { apiBase } from "@/shared/api/client";
 import { asLocation, asOffer, asOfferClosed, asRide } from "./parse";
 import { openConnection } from "./connectionLifecycle";
@@ -8,6 +8,9 @@ export function openRideConnection(userId: string, handlers: RideHandlers): () =
   return openConnection((isActive) => {
     const connection = new HubConnectionBuilder()
       .withUrl(`${apiBase()}/hubs/ride?userId=${encodeURIComponent(userId)}`, {
+        // Long polling is ordinary HTTP, so the Next.js server can add the Entra token.
+        // A browser WebSocket would connect to the API without that server in the middle.
+        transport: HttpTransportType.LongPolling,
         headers: { "X-User-Id": userId },
       })
       .withAutomaticReconnect()
