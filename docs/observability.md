@@ -10,15 +10,27 @@ The API writes structured JSON logs to standard output in every environment. Whe
 4. Open GitHub **Actions → Deployment → Run workflow**, check **Deploy to Azure production**, and run it. The workflow deploys `main` and verifies its Build/CI results before preparing Azure resources.
 5. In Azure, open **Application Insights → appi-grabbike-api**. Exercise the rider/driver flow and then inspect **Failures**, **Performance**, and **Logs**. Allow time for buffered telemetry ingestion.
 
-The preparation script creates a Log Analytics workspace and a workspace-based Application Insights component when missing, then sets the API's `APPLICATIONINSIGHTS_CONNECTION_STRING` and `OTEL_SERVICE_NAME=happy-ride-api`. It uses core Azure CLI commands, so the `application-insights` extension is not required. See the [resource CLI](https://learn.microsoft.com/en-us/cli/azure/resource?view=azure-cli-latest#az-resource-create) and [component resource schema](https://learn.microsoft.com/en-us/azure/templates/microsoft.insights/2020-02-02/components).
+By default, the preparation script creates a Log Analytics workspace and a workspace-based Application Insights component when missing, then sets the API's `APPLICATIONINSIGHTS_CONNECTION_STRING` and `OTEL_SERVICE_NAME=happy-ride-api`. It uses core Azure CLI commands, so the `application-insights` extension is not required. See the [resource CLI](https://learn.microsoft.com/en-us/cli/azure/resource?view=azure-cli-latest#az-resource-create) and [component resource schema](https://learn.microsoft.com/en-us/azure/templates/microsoft.insights/2020-02-02/components).
 
-No additional GitHub connection-string secret is required. The script reads the component's connection string directly from Azure, masks it in GitHub Actions, and suppresses app-settings output. Do not run the scripts with shell tracing or Azure CLI `--debug`. Do not enable App Service's separate codeless Application Insights agent alongside the API's SDK instrumentation.
+An optional GitHub secret can supply the connection string instead, as described below. When it is absent or empty, the script reads the component's connection string directly from Azure. Both paths mask the value in GitHub Actions and suppress app-settings output. Do not run the scripts with shell tracing or Azure CLI `--debug`. Do not enable App Service's separate codeless Application Insights agent alongside the API's SDK instrumentation.
 
 The helper is called by `.github/scripts/deploy-azure.sh`; editing these files or merging a PR does not provision resources. Resources and application settings change only when the manual deployment runs.
 
+### Supply the connection string through GitHub
+
+1. Create or select an existing workspace-based Application Insights resource in Azure. In its **Overview** page, copy the complete **Connection string**, including its endpoint fields.
+2. Open this GitHub repository's **Settings → Environments → production → Environment secrets → Add environment secret**.
+3. Name the secret `APPLICATIONINSIGHTS_CONNECTION_STRING`, paste the complete value, and save it. Store it as a secret, not a repository variable or a committed file. A repository Actions secret with the same name is also supported; the `production` environment secret takes precedence if both exist.
+4. After **Build** and **CI** are green on `main`, run **Actions → Deployment → Run workflow** with **Deploy to Azure production** checked. The preparation step passes the secret to the script, which applies it to the backend App Service along with `OTEL_SERVICE_NAME=happy-ride-api`. The frontend receives neither setting.
+5. Verify telemetry in the Application Insights resource associated with that connection string, using the queries below.
+
+A nonempty secret takes priority over Azure monitoring resource lookup and creation. The supplied Application Insights resource must already exist; this path does not create, validate, or relink monitoring resources. The monitoring variables below are ignored for this path. The deployment identity still needs permission to prepare the App Service resources and update the API settings, but the helper does not need monitoring-resource read/create access when a connection string is supplied.
+
+Every deployment reapplies the current secret. To rotate or replace it, update the GitHub secret and run the deployment again; changing the secret alone does not update a running app. Removing the secret (including a same-named repository secret, if present) restores the default Azure lookup/provisioning path on the next deployment. It does not disable telemetry or clear the existing App Service setting immediately.
+
 ## Resource names and reuse
 
-Optional GitHub repository/environment **Variables** configure monitoring:
+When no connection-string secret is supplied, optional GitHub repository/environment **Variables** configure monitoring:
 
 | Variable | Default | Applied when |
 | --- | --- | --- |
