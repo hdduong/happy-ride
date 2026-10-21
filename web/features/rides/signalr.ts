@@ -1,27 +1,21 @@
-import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
-import { realtimeBase } from "@/shared/api/base";
+import { HttpTransportType, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
+import { apiBase } from "@/shared/api/client";
 import { asLocation, asOffer, asOfferClosed, asRide } from "./parse";
 import { openConnection } from "./connectionLifecycle";
 import { observeConnectionActivity } from "./connectionActivity";
 import type { RideHandlers } from "./session";
 import type { ActivityClient } from "@/shared/telemetry/activity";
 
-async function readRealtimeToken(): Promise<string> {
-  if (typeof window === "undefined") return "";
-  const response = await fetch("/backend/realtime-token");
-  if (!response.ok) return "";
-  const body = (await response.json()) as { token?: string | null };
-  return body.token ?? "";
-}
-
 export function openRideConnection(userId: string, handlers: RideHandlers, activity?: ActivityClient): () => void {
   let lifecycle: ReturnType<typeof observeConnectionActivity>;
   return openConnection((isActive) => {
     const sessionQuery = activity ? `&appSessionId=${encodeURIComponent(activity.appSessionId)}` : "";
     const connection = new HubConnectionBuilder()
-      .withUrl(`${realtimeBase()}/hubs/ride?userId=${encodeURIComponent(userId)}${sessionQuery}`, {
+      .withUrl(`${apiBase()}/hubs/ride?userId=${encodeURIComponent(userId)}${sessionQuery}`, {
+        // Long polling stays on this server, which adds the Entra token.
+        // A browser WebSocket cannot carry that server-only credential.
+        transport: HttpTransportType.LongPolling,
         headers: { "X-User-Id": userId },
-        accessTokenFactory: readRealtimeToken,
       })
       .withAutomaticReconnect()
       .configureLogging({

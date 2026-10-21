@@ -1,4 +1,4 @@
-import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 // Seeded personas: rider An Nguyễn, driver Khoa Phạm.
 const riderId = '11111111-1111-1111-1111-111111111111';
@@ -17,10 +17,6 @@ type Activity = {
 async function observeActivity(page: Page) {
   const events: Activity[] = [];
   const commands: { action: string; activityId?: string; appSessionId?: string; rideId?: string }[] = [];
-  let socket: { client: WebSocketRoute; server: WebSocketRoute } | undefined;
-  await page.routeWebSocket(/\/hubs\/ride\?/, (client) => {
-    socket = { client, server: client.connectToServer() };
-  });
   page.on('response', (response) => {
     const request = response.request();
     if (request.method() !== 'POST' || !response.ok()) return;
@@ -36,10 +32,22 @@ async function observeActivity(page: Page) {
   return {
     events, commands,
     async disconnect() {
-      expect(socket, 'a real SignalR WebSocket must be connected').toBeDefined();
-      const current = socket!;
-      // Close only this browser's real connection; keep the API and polling up.
-      await Promise.all([current.client.close({ code: 1012 }), current.server.close({ code: 1012 })]);
+      // The live connection is long polling through the Next.js server, so the
+      // application token stays there. Fail one poll and let SignalR reconnect.
+      const pattern = /\/backend\/hubs\/ride\?/;
+      let dropped = false;
+      await new Promise<void>((resolve) => {
+        void page.route(pattern, async (route) => {
+          if (!dropped && route.request().method() === 'GET') {
+            dropped = true;
+            await route.abort('connectionfailed');
+            await page.unroute(pattern);
+            resolve();
+            return;
+          }
+          await route.continue();
+        });
+      });
     },
   };
 }
