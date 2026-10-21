@@ -112,7 +112,8 @@ jobs:
             --query properties.outputs \
             --output json > infra-outputs.json
           host="$(python3 -c 'import json; print(json.load(open("infra-outputs.json"))["postgresHost"]["value"])')"
-          bus="$(python3 -c 'import json; print(json.load(open("infra-outputs.json"))["serviceBusConnectionString"]["value"])')"
+          namespace="$(python3 -c 'import json; print(json.load(open("infra-outputs.json"))["serviceBusNamespaceName"]["value"])')"
+          bus="$(az servicebus queue authorization-rule keys list --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" --namespace-name "$namespace" --queue-name dispatch --name dispatch-worker --query primaryConnectionString -o tsv)"
           provider="Fake"
           if [ -n "$VIETMAP_API_KEY" ] && [ -n "$VIETMAP_TILEMAP_KEY" ]; then
             provider="VietMap"

@@ -90,7 +90,6 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-0
 }
 
 output postgresHost string = postgres.properties.fullyQualifiedDomainName
-@secure()
-output serviceBusConnectionString string = listKeys(dispatchAccess.id, dispatchAccess.apiVersion).primaryConnectionString
+output serviceBusNamespaceName string = serviceBus.name
 output dispatchQueueName string = dispatchQueue.name
 output apiAppName string = apiAppName
