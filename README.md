@@ -7,13 +7,14 @@
 
 A merge into `main` runs **Build** and **CI**. Build compiles the API and the web app. CI runs the API tests and the browser ride test. When both are green, CI opens a deployment request. Azure changes only after you open [Deployment](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml), click **Run workflow**, check **Deploy to Azure production**, and click the green **Run workflow** button.
 
-That button creates or updates one Linux B1 App Service plan, `plan-grabbike`, in `rg-grabbike-dev` (about $13 per month, shared by the API and the web). A successful deploy tags `v1.0.<commit count>` and updates the version badge.
+That button creates or updates one Linux B1 App Service plan, `plan-grabbike`, in `rg-grabbike-dev` (shared by the API and the web). It also creates or reuses Application Insights and a Log Analytics workspace for API telemetry. A successful deploy tags `v1.0.<commit count>` and updates the version badge. Monitoring ingestion is usage-billed; see the defaults and activation steps in [`docs/observability.md`](docs/observability.md).
 
 Motorbike ride demo with an ASP.NET Core API and Next.js rider and driver screens. The current demo uses SQLite, seeded users, simulated driver movement, and fake places/routes.
 
 - [`AGENTS.md`](AGENTS.md) — how the team works in this repo
 - [`.cursor/agents/`](.cursor/agents/) — planner, implementer, verifier, and reviewer
 - [`docs/architecture.md`](docs/architecture.md) — feature ownership, dependency rules, and current implementation limits
+- [`docs/observability.md`](docs/observability.md) — structured logs, trace IDs, Azure activation, queries, and volume/retention settings
 - [`docs/build-plan.md`](docs/build-plan.md) — target MVP architecture and remaining integrations
 
 Run the API with `dotnet run --project src/GrabBike.Api --launch-profile http`. In `web/`, run `npm ci` and `npm run dev`. Open the user picker at `http://localhost:3000`, or use the seeded rider and driver links in `AGENTS.md`.

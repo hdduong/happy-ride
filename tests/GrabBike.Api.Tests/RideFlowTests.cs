@@ -433,6 +433,7 @@ public class RideFlowTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseSetting("APPLICATIONINSIGHTS_CONNECTION_STRING", "");
             builder.UseSetting("ConnectionStrings:GrabBike", $"Data Source={_databasePath}");
             if (publisher is not null)
             {
