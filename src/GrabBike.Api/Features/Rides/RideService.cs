@@ -25,7 +25,8 @@ public sealed class RideService(
     IDriverRepository drivers,
     IDispatchService dispatch,
     IUnitOfWork unitOfWork,
-    IRideWriteLock writeLock) : IRideService
+    IRideWriteLock writeLock,
+    ILogger<RideService> logger) : IRideService
 {
     public async Task<RideOutcome> CreateAsync(Guid riderId, Guid quoteId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
@@ -58,6 +59,9 @@ public sealed class RideService(
         var result = new RideOutcome.Created(new CreatedRideDto(ride.Id));
         await dispatch.AdvanceAsync(ride, now, result.Events, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        logger.LogInformation(new EventId(2000, "RideBooked"),
+            "Ride {RideId} booked with status {Status}", ride.Id, ride.Status.ToString());
+        DispatchLogging.Committed(logger, result.Events);
         return result;
     }
 
@@ -108,6 +112,7 @@ public sealed class RideService(
         await ReleaseDriverAsync(ride, cancellationToken);
         var result = await StatusResultAsync(ride, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        LogTransition(ride, RideStatus.DroppedOff);
         return result;
     }
 
@@ -122,6 +127,7 @@ public sealed class RideService(
         if (ride.Status is not (RideStatus.Searching or RideStatus.Accepted or RideStatus.DriverArrived))
             return new RideOutcome.TransitionConflict(ride.Status.ToString(), RideStatus.Cancelled.ToString());
 
+        var previousStatus = ride.Status;
         ride.Status = RideStatus.Cancelled;
         await ReleaseDriverAsync(ride, cancellationToken);
         var result = await StatusResultAsync(ride, cancellationToken);
@@ -130,10 +136,12 @@ public sealed class RideService(
             if (offer.Status != OfferStatus.Pending)
                 continue;
             offer.Status = OfferStatus.Closed;
-            result.Events.Add(new OutboundEvent.OfferClosed(offer.DriverId, offer.Id, "Cancelled"));
+            result.Events.Add(new OutboundEvent.OfferClosed(offer.DriverId, offer.Id, ride.Id, "Cancelled"));
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        LogTransition(ride, previousStatus);
+        DispatchLogging.Committed(logger, result.Events);
         return result;
     }
 
@@ -176,8 +184,14 @@ public sealed class RideService(
 
         var result = await StatusResultAsync(ride, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        LogTransition(ride, required);
         return result;
     }
+
+    private void LogTransition(Ride ride, RideStatus previousStatus) =>
+        logger.LogInformation(new EventId(2001, "RideStatusChanged"),
+            "Ride {RideId} changed from {FromStatus} to {Status} with driver {DriverId}",
+            ride.Id, previousStatus.ToString(), ride.Status.ToString(), ride.DriverId);
 
     private async Task SnapToRouteStartAsync(Ride ride, CancellationToken cancellationToken)
     {

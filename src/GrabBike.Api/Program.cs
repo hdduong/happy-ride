@@ -6,6 +6,7 @@ using GrabBike.Api.Features.Drivers;
 using GrabBike.Api.Features.Maps;
 using GrabBike.Api.Features.Realtime;
 using GrabBike.Api.Features.Rides;
+using GrabBike.Api.Infrastructure.Observability;
 using GrabBike.Api.Infrastructure.Persistence;
 using GrabBike.Api.Infrastructure.Persistence.Repositories;
 using GrabBike.Api.SharedKernel;
@@ -15,6 +16,7 @@ using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddApplicationObservability();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -57,6 +59,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
+            .WithExposedHeaders(RequestTelemetry.TraceHeader)
             .AllowCredentials();
     });
 });
@@ -103,6 +106,8 @@ await using (var scope = app.Services.CreateAsyncScope())
     await db.Database.EnsureCreatedAsync();
     await DatabaseSeeder.SeedAsync(db);
 }
+
+app.UseApplicationObservability();
 
 if (app.Environment.IsDevelopment())
 {

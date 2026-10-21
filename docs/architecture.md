@@ -31,6 +31,8 @@ State is saved before realtime notifications are sent. Notification delivery is 
 
 The SQLite demo serializes writes with a process-local lock. This supports the existing single-process tests, including concurrent offer acceptance. Multiple API instances require database-level concurrency controls and coordination; moving files into features does not provide those guarantees.
 
+The HTTP boundary records request outcomes and handles unexpected exceptions centrally. Feature services add structured ride/offer identifiers to business logs; they do not depend on an Azure telemetry SDK. JSON console output is always available, and Azure Monitor export is enabled only when the API has `APPLICATIONINSIGHTS_CONNECTION_STRING`. The existing manual deployment creates or reuses the monitoring resources. See [observability](observability.md) for activation, queries, collection limits, and retention behavior.
+
 ## Frontend
 
 ```text
