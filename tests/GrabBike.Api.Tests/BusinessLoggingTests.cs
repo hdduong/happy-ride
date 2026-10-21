@@ -52,17 +52,30 @@ public sealed class BusinessLoggingTests
     {
         await using var fixture = await Fixture.CreateAsync();
         var rideId = await fixture.BookAsync();
-        if (accepted) await fixture.Offers.AcceptAsync(DriverId, await fixture.OfferForDriverAsync(), Now);
+        var offerId = await fixture.OfferForDriverAsync();
+        if (accepted) await fixture.Offers.AcceptAsync(DriverId, offerId, Now);
         fixture.Logs.Entries.Clear();
         fixture.Logs.Observe = fixture.AssertCommitted;
 
         await fixture.Rides.CancelAsync(RiderId, rideId);
 
         var cancelled = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "RideStatusChanged");
+        Assert.Equal(rideId, cancelled.Fields["RideId"]);
         Assert.Equal(accepted ? "Accepted" : "Searching", cancelled.Fields["FromStatus"]);
         Assert.Equal("Cancelled", cancelled.Fields["Status"]);
-        if (!accepted)
-            Assert.Equal(1, fixture.Logs.Entries.Count(entry => entry.Event.Name == "DispatchOfferClosed"));
+        Assert.Equal(accepted ? 1 : 2, fixture.Logs.Entries.Count);
+        if (accepted)
+        {
+            Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchOfferClosed");
+        }
+        else
+        {
+            var closed = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchOfferClosed");
+            Assert.Equal(rideId, closed.Fields["RideId"]);
+            Assert.Equal(offerId, closed.Fields["OfferId"]);
+            Assert.Equal(DriverId, closed.Fields["DriverId"]);
+            Assert.Equal("Cancelled", closed.Fields["Reason"]);
+        }
     }
 
     [Fact]
@@ -75,39 +88,106 @@ public sealed class BusinessLoggingTests
         fixture.Logs.Observe = fixture.AssertCommitted;
 
         await fixture.Offers.DeclineAsync(DriverId, offerId, Now);
-        await fixture.Offers.DeclineAsync(DriverId, offerId, Now);
 
+        Assert.Equal(3, fixture.Logs.Entries.Count);
         var declined = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "OfferDeclined");
         Assert.Equal(rideId, declined.Fields["RideId"]);
         Assert.Equal(offerId, declined.Fields["OfferId"]);
         Assert.Equal(DriverId, declined.Fields["DriverId"]);
-        var nextRound = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchRoundStarted");
-        Assert.Equal(2, nextRound.Fields["Round"]);
-        Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchOfferCreated");
-        Assert.Equal(3, fixture.Logs.Entries.Count);
+        var replacement = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchOfferCreated");
+        Assert.Equal(rideId, replacement.Fields["RideId"]);
+        Assert.NotEqual(offerId, Assert.IsType<Guid>(replacement.Fields["OfferId"]));
+        Assert.NotEqual(DriverId, Assert.IsType<Guid>(replacement.Fields["DriverId"]));
+        Assert.Equal(2, replacement.Fields["Round"]);
+        var round = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchRoundStarted");
+        Assert.Equal(rideId, round.Fields["RideId"]);
+        Assert.Equal(2, round.Fields["Round"]);
+
+        fixture.Logs.Entries.Clear();
+        await fixture.Offers.DeclineAsync(DriverId, offerId, Now);
+        Assert.Empty(fixture.Logs.Entries);
     }
 
     [Fact]
     public async Task Expiry_logs_committed_rounds_and_exhaustion_but_idle_ticks_are_quiet()
     {
         await using var fixture = await Fixture.CreateAsync();
+        HashSet<Guid> eligibleDriverIds;
+        using (var seeded = fixture.ReadContext())
+        {
+            var pickup = seeded.Quotes.AsNoTracking().Single(quote => quote.Id == fixture.QuoteId).Pickup;
+            eligibleDriverIds = seeded.Drivers.AsNoTracking().ToList()
+                .Where(driver => driver.Status == DriverStatus.Online && driver.CurrentRideId is null
+                    && Geo.HaversineMeters(pickup.Lat, pickup.Lng, driver.Lat, driver.Lng) <= 3000)
+                .Select(driver => driver.UserId).ToHashSet();
+            Assert.Equal(4, eligibleDriverIds.Count);
+        }
         var rideId = await fixture.BookAsync();
+        var currentOfferId = await fixture.OfferForDriverAsync();
+        var currentDriverId = DriverId;
+        HashSet<Guid> offeredIds = [currentOfferId];
+        HashSet<Guid> offeredDriverIds = [currentDriverId];
         fixture.Logs.Entries.Clear();
         fixture.Logs.Observe = fixture.AssertCommitted;
 
         await fixture.Expiry.AdvanceAsync(Now.AddSeconds(1));
         Assert.Empty(fixture.Logs.Entries);
-        await fixture.Expiry.AdvanceAsync(Now.AddSeconds(31));
-        var round = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchRoundStarted");
-        Assert.Equal(2, round.Fields["Round"]);
-        Assert.Equal(1, fixture.Logs.Entries.Count(entry => entry.Event.Name == "DispatchOfferClosed"));
+        foreach (var (seconds, expectedRound) in new[] { (31, 2), (62, 3), (93, 4) })
+        {
+            var before = fixture.Logs.Entries.Count;
+            await fixture.Expiry.AdvanceAsync(Now.AddSeconds(seconds));
+            var emitted = fixture.Logs.Entries.Skip(before).ToArray();
+            Assert.Equal(3, emitted.Length);
+            var closed = Assert.Single(emitted, entry => entry.Event.Name == "DispatchOfferClosed");
+            Assert.Equal(rideId, closed.Fields["RideId"]);
+            Assert.Equal(currentOfferId, closed.Fields["OfferId"]);
+            Assert.Equal(currentDriverId, closed.Fields["DriverId"]);
+            Assert.Equal("Expired", closed.Fields["Reason"]);
 
-        await fixture.Expiry.AdvanceAsync(Now.AddSeconds(62));
-        await fixture.Expiry.AdvanceAsync(Now.AddSeconds(93));
+            var replacement = Assert.Single(emitted, entry => entry.Event.Name == "DispatchOfferCreated");
+            Assert.Equal(rideId, replacement.Fields["RideId"]);
+            Assert.Equal(expectedRound, replacement.Fields["Round"]);
+            currentOfferId = Assert.IsType<Guid>(replacement.Fields["OfferId"]);
+            currentDriverId = Assert.IsType<Guid>(replacement.Fields["DriverId"]);
+            Assert.True(offeredIds.Add(currentOfferId), "Each replacement must have a new offer ID.");
+            Assert.True(offeredDriverIds.Add(currentDriverId), "Each replacement must try a different driver.");
+            Assert.Contains(currentDriverId, eligibleDriverIds);
+            var round = Assert.Single(emitted, entry => entry.Event.Name == "DispatchRoundStarted");
+            Assert.Equal(rideId, round.Fields["RideId"]);
+            Assert.Equal(expectedRound, round.Fields["Round"]);
+            Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchExhausted");
+        }
+
+        var beforeExhaustion = fixture.Logs.Entries.Count;
         await fixture.Expiry.AdvanceAsync(Now.AddSeconds(124));
+        var finalEvents = fixture.Logs.Entries.Skip(beforeExhaustion).ToArray();
+        Assert.Equal(2, finalEvents.Length);
+        var finalClosed = Assert.Single(finalEvents, entry => entry.Event.Name == "DispatchOfferClosed");
+        Assert.Equal(currentOfferId, finalClosed.Fields["OfferId"]);
+        Assert.Equal(currentDriverId, finalClosed.Fields["DriverId"]);
         var exhausted = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchExhausted");
         Assert.Equal(rideId, exhausted.Fields["RideId"]);
         Assert.Equal("NoDriver", exhausted.Fields["Status"]);
+        Assert.Equal(4, exhausted.Fields["Round"]);
+        var closures = fixture.Logs.Entries.Where(entry => entry.Event.Name == "DispatchOfferClosed").ToArray();
+        Assert.Equal(4, closures.Length);
+        Assert.Equal(4, closures.Select(entry => (Guid)entry.Fields["OfferId"]!).Distinct().Count());
+        Assert.True(eligibleDriverIds.SetEquals(closures.Select(entry => (Guid)entry.Fields["DriverId"]!)));
+        Assert.All(closures, entry =>
+        {
+            Assert.Equal(rideId, entry.Fields["RideId"]);
+            Assert.Equal("Expired", entry.Fields["Reason"]);
+        });
+        using (var persisted = fixture.ReadContext())
+        {
+            var offers = persisted.Offers.AsNoTracking().Where(offer => offer.RideId == rideId).ToArray();
+            Assert.Equal(4, offers.Length);
+            Assert.All(offers, offer => Assert.Equal(OfferStatus.Closed, offer.Status));
+            Assert.DoesNotContain(offers, offer => offer.Status == OfferStatus.Pending);
+            var ride = persisted.Rides.AsNoTracking().Single(ride => ride.Id == rideId);
+            Assert.Equal(RideStatus.NoDriver, ride.Status);
+            Assert.Equal(4, ride.Round);
+        }
         var count = fixture.Logs.Entries.Count;
         await fixture.Expiry.AdvanceAsync(Now.AddSeconds(125));
         Assert.Equal(count, fixture.Logs.Entries.Count);
