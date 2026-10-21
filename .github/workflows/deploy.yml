@@ -147,13 +147,15 @@ jobs:
               Sim__Enabled="true"
           if [ -n "${AZURE_TENANT_ID:-}" ] && [ -n "${AZURE_API_CLIENT_ID:-}" ] && [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
             client_id="${AZURE_CLIENT_ID:-$AZURE_API_CLIENT_ID}"
+            scope="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
+            audience="${scope%/.default}"
             az webapp config appsettings set \
               --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
               --name "${AZURE_API_APP:-app-grabbike-api}" \
               --settings \
                 AzureAd__TenantId="$AZURE_TENANT_ID" \
                 AzureAd__ClientId="$AZURE_API_CLIENT_ID" \
-                AzureAd__Audience="api://${AZURE_API_CLIENT_ID}" \
+                AzureAd__Audience="$audience" \
                 AzureAd__AllowedClientId="$client_id"
             az webapp config appsettings set \
               --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
@@ -163,7 +165,7 @@ jobs:
                 AZURE_CLIENT_ID="$client_id" \
                 AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET" \
                 AZURE_API_CLIENT_ID="$AZURE_API_CLIENT_ID" \
-                AZURE_API_SCOPE="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
+                AZURE_API_SCOPE="$scope"
           else
             echo "Entra application token is not configured. Clearing any stored Entra settings so the API does not keep a stale token requirement."
             rg="${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}"
