@@ -110,11 +110,17 @@ jobs:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
           AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          AZURE_WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
           MAPS_PROVIDER: ${{ vars.MAPS_PROVIDER }}
           VIETMAP_API_KEY: ${{ secrets.VIETMAP_API_KEY }}
           VIETMAP_TILEMAP_KEY: ${{ secrets.VIETMAP_TILEMAP_KEY }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           GOOGLE_MAPS_BROWSER_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_API_SCOPE: ${{ vars.AZURE_API_SCOPE }}
         run: |
           if [ -z "$POSTGRES_ADMIN_PASSWORD" ]; then
             echo "POSTGRES_ADMIN_PASSWORD is not set. The API requires Azure Postgres, so deployment stops here."
@@ -153,6 +159,33 @@ jobs:
               Maps__Google__ApiKey="$GOOGLE_MAPS_API_KEY" \
               Maps__Google__BrowserKey="$GOOGLE_MAPS_BROWSER_KEY" \
               Sim__Enabled="true"
+          if [ -n "${AZURE_TENANT_ID:-}" ] && [ -n "${AZURE_API_CLIENT_ID:-}" ] && [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
+            echo "Entra settings stay unchanged until the API package is deployed and can accept the current token."
+          else
+            echo "Entra application token is not configured. Clearing any stored Entra settings so the API does not keep a stale token requirement."
+            rg="${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}"
+            delete_settings() {
+              local app="$1"
+              shift
+              local existing
+              existing="$(az webapp config appsettings list --resource-group "$rg" --name "$app" --query "[].name" -o tsv)"
+              local remove=()
+              local name
+              for name in "$@"; do
+                if printf '%s\n' "$existing" | grep -Fxq "$name"; then
+                  remove+=("$name")
+                fi
+              done
+              if [ "${#remove[@]}" -gt 0 ]; then
+                az webapp config appsettings delete --resource-group "$rg" --name "$app" --setting-names "${remove[@]}"
+              fi
+            }
+            delete_settings "${AZURE_API_APP:-app-grabbike-api}" \
+              AzureAd__TenantId AzureAd__ClientId AzureAd__Audience AzureAd__AllowedClientId \
+              AzureAd__PreviousTenantId AzureAd__PreviousClientId AzureAd__PreviousAudience AzureAd__PreviousAllowedClientId
+            delete_settings "${AZURE_WEB_APP:-app-grabbike-web}" \
+              AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_API_CLIENT_ID AZURE_API_SCOPE
+          fi
           rm -f infra-outputs.json
 
       - name: Deploy the API
@@ -161,11 +194,135 @@ jobs:
           app-name: ${{ vars.AZURE_API_APP_NAME || 'app-grabbike-api' }}
           package: publish/api
 
+      - name: Accept the current and new Entra identities
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          AZURE_WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_API_SCOPE: ${{ vars.AZURE_API_SCOPE }}
+        run: |
+          if [ -z "${AZURE_TENANT_ID:-}" ] || [ -z "${AZURE_API_CLIENT_ID:-}" ] || [ -z "${AZURE_CLIENT_SECRET:-}" ]; then
+            echo "Entra application token is not configured."
+            exit 0
+          fi
+          rg="${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}"
+          api="${AZURE_API_APP:-app-grabbike-api}"
+          web="${AZURE_WEB_APP:-app-grabbike-web}"
+          setting() {
+            az webapp config appsettings list --resource-group "$rg" --name "$1" --query "[?name=='$2'].value | [0]" -o tsv
+          }
+          same() { [ "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')" ]; }
+          old_tenant="$(setting "$api" AzureAd__TenantId)"
+          old_client="$(setting "$api" AzureAd__ClientId)"
+          old_audience="$(setting "$api" AzureAd__Audience)"
+          old_allowed="$(setting "$api" AzureAd__AllowedClientId)"
+          new_allowed="${AZURE_CLIENT_ID:-$AZURE_API_CLIENT_ID}"
+          new_scope="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
+          new_audience="${new_scope%/.default}"
+          if [ -n "$old_tenant" ] && { ! same "$old_tenant" "$AZURE_TENANT_ID" || ! same "$old_client" "$AZURE_API_CLIENT_ID" || ! same "$old_audience" "$new_audience" || ! same "$old_allowed" "$new_allowed"; }; then
+            overlap=(
+              AzureAd__TenantId="$AZURE_TENANT_ID"
+              AzureAd__ClientId="$AZURE_API_CLIENT_ID"
+              AzureAd__Audience="$new_audience"
+              AzureAd__AllowedClientId="$new_allowed"
+            )
+            if ! same "$old_tenant" "$AZURE_TENANT_ID"; then
+              overlap+=(
+                AzureAd__PreviousTenantId="$old_tenant"
+                AzureAd__PreviousClientId="$old_client"
+                AzureAd__PreviousAudience="$old_audience"
+                AzureAd__PreviousAllowedClientId="$old_allowed"
+              )
+            else
+              if ! same "$old_client" "$AZURE_API_CLIENT_ID"; then overlap+=(AzureAd__PreviousClientId="$old_client"); fi
+              if ! same "$old_audience" "$new_audience"; then overlap+=(AzureAd__PreviousAudience="$old_audience"); fi
+              if ! same "$old_allowed" "$new_allowed"; then overlap+=(AzureAd__PreviousAllowedClientId="$old_allowed"); fi
+            fi
+            az webapp config appsettings set --resource-group "$rg" --name "$api" --settings "${overlap[@]}"
+            stale=()
+            if same "$old_tenant" "$AZURE_TENANT_ID"; then
+              stale+=(AzureAd__PreviousTenantId)
+              if same "$old_client" "$AZURE_API_CLIENT_ID"; then stale+=(AzureAd__PreviousClientId); fi
+              if same "$old_audience" "$new_audience"; then stale+=(AzureAd__PreviousAudience); fi
+              if same "$old_allowed" "$new_allowed"; then stale+=(AzureAd__PreviousAllowedClientId); fi
+            fi
+            if [ "${#stale[@]}" -gt 0 ]; then
+              existing="$(az webapp config appsettings list --resource-group "$rg" --name "$api" --query "[].name" -o tsv)"
+              drop=()
+              for name in "${stale[@]}"; do
+                if printf '%s\n' "$existing" | grep -Fxq "$name"; then drop+=("$name"); fi
+              done
+              if [ "${#drop[@]}" -gt 0 ]; then
+                az webapp config appsettings delete --resource-group "$rg" --name "$api" --setting-names "${drop[@]}"
+              fi
+            fi
+          fi
+          web_tenant="$(setting "$web" AZURE_TENANT_ID)"
+          web_client="$(setting "$web" AZURE_CLIENT_ID)"
+          web_secret="$(setting "$web" AZURE_CLIENT_SECRET)"
+          web_api="$(setting "$web" AZURE_API_CLIENT_ID)"
+          web_scope="$(setting "$web" AZURE_API_SCOPE)"
+          if same "$web_tenant" "$AZURE_TENANT_ID" && same "$web_client" "$new_allowed" && [ "$web_secret" = "$AZURE_CLIENT_SECRET" ] && same "$web_api" "$AZURE_API_CLIENT_ID" && [ "$web_scope" = "$new_scope" ]; then
+            echo "Web Entra settings already match."
+          else
+            az webapp config appsettings set \
+              --resource-group "$rg" \
+              --name "$web" \
+              --settings \
+                AZURE_TENANT_ID="$AZURE_TENANT_ID" \
+                AZURE_CLIENT_ID="$new_allowed" \
+                AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET" \
+                AZURE_API_CLIENT_ID="$AZURE_API_CLIENT_ID" \
+                AZURE_API_SCOPE="$new_scope"
+          fi
+
       - name: Deploy the web app
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEB_APP_NAME || 'app-grabbike-web' }}
           package: web/.next/standalone
+
+      - name: Keep only the new Entra identity
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_API_SCOPE: ${{ vars.AZURE_API_SCOPE }}
+        run: |
+          if [ -z "${AZURE_TENANT_ID:-}" ] || [ -z "${AZURE_API_CLIENT_ID:-}" ] || [ -z "${AZURE_CLIENT_SECRET:-}" ]; then
+            echo "Entra application token is not configured. The API keeps the cleared settings from the earlier step."
+            exit 0
+          fi
+          rg="${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}"
+          api="${AZURE_API_APP:-app-grabbike-api}"
+          client_id="${AZURE_CLIENT_ID:-$AZURE_API_CLIENT_ID}"
+          scope="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
+          audience="${scope%/.default}"
+          az webapp config appsettings set \
+            --resource-group "$rg" \
+            --name "$api" \
+            --settings \
+              AzureAd__TenantId="$AZURE_TENANT_ID" \
+              AzureAd__ClientId="$AZURE_API_CLIENT_ID" \
+              AzureAd__Audience="$audience" \
+              AzureAd__AllowedClientId="$client_id"
+          existing="$(az webapp config appsettings list --resource-group "$rg" --name "$api" --query "[].name" -o tsv)"
+          remove=()
+          for name in AzureAd__PreviousTenantId AzureAd__PreviousClientId AzureAd__PreviousAudience AzureAd__PreviousAllowedClientId; do
+            if printf '%s\n' "$existing" | grep -Fxq "$name"; then
+              remove+=("$name")
+            fi
+          done
+          if [ "${#remove[@]}" -gt 0 ]; then
+            az webapp config appsettings delete --resource-group "$rg" --name "$api" --setting-names "${remove[@]}"
+          fi
 
       - name: Publish the version
         env:

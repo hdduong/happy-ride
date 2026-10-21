@@ -1,3 +1,4 @@
+import { currentPersonaProof, ensurePersonaSession, forgetPersonaSession } from "./personaSession";
 import { apiBase } from "./base";
 import { getActivityClient } from "../telemetry/browser";
 import type { Correlation } from "../telemetry/activity";
@@ -39,8 +40,21 @@ type RequestOptions = {
   telemetry?: Correlation;
 };
 
+async function send(path: string, method: string, headers: Headers, body: string | undefined): Promise<Response> {
+  return fetch(`${apiBase()}${path}`, {
+    method,
+    headers,
+    body,
+    cache: "no-store",
+  });
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const actor = options.userId ?? null;
+  if (actor) await ensurePersonaSession(actor);
   const headers = new Headers();
+  const proof = actor ? currentPersonaProof(actor) : null;
+  if (proof) headers.set("X-Persona", proof);
   if (options.userId) headers.set("X-User-Id", options.userId);
   const telemetry = options.telemetry ?? getActivityClient(options.userId)?.correlation();
   if (telemetry) {
@@ -54,12 +68,15 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(`${apiBase()}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body,
-    cache: "no-store",
-  });
+  let response = await send(path, options.method ?? "GET", headers, body);
+  if (response.status === 401 && actor) {
+    forgetPersonaSession(actor);
+    await ensurePersonaSession(actor);
+    const renewed = currentPersonaProof(actor);
+    if (renewed) headers.set("X-Persona", renewed);
+    else headers.delete("X-Persona");
+    response = await send(path, options.method ?? "GET", headers, body);
+  }
 
   if (response.status === 204 || response.status === 205) return null as T;
   const text = await response.text();

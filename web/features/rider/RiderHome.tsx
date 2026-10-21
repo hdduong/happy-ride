@@ -11,7 +11,7 @@ export function RiderHome({ userId }: { userId: string }) {
   const map = riderMap(booking);
   return (
     <Stage
-      map={<MapCanvas center={map.pickup} route={map.route} markers={map.markers}
+      map={<MapCanvas userId={userId} center={map.pickup} route={map.route} markers={map.markers}
         pulse={booking.ride?.status === "Searching" ? map.pickup : null} />}
       sheet={<BookingSheet booking={booking} driverLive={map.driverLive} />}
     />

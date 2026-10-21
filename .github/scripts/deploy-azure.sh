@@ -100,6 +100,7 @@ az webapp config appsettings set \
     PORT="8080" \
     HOSTNAME="0.0.0.0" \
     WEBSITES_CONTAINER_START_TIME_LIMIT="600" \
+    API_BASE_URL="https://${API_APP}.azurewebsites.net" \
   --output none
 
 az webapp update --resource-group "$RG" --name "$WEB_APP" --set httpsOnly=true >/dev/null

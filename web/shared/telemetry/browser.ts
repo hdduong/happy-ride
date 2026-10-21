@@ -1,4 +1,5 @@
 import { apiBase } from "../api/base";
+import { currentPersonaProof, ensurePersonaSession, forgetPersonaSession } from "../api/personaSession";
 import { createActivityClient, type Activity, type ActivityClient } from "./activity";
 
 type MountedSession = { client: ActivityClient; owners: number; detach: () => void };
@@ -27,11 +28,26 @@ async function send(userId: string, activity: Activity): Promise<"sent" | "retry
       "X-App-Session-Id": activity.appSessionId, "X-Activity-Id": activity.activityId,
     };
     if (activity.rideId) headers["X-Ride-Id"] = activity.rideId;
-    const response = await fetch(`${apiBase()}/api/telemetry/activity`, {
+    await ensurePersonaSession(userId);
+    const proof = currentPersonaProof(userId);
+    if (proof) headers["X-Persona"] = proof;
+    let response = await fetch(`${apiBase()}/api/telemetry/activity`, {
       method: "POST", keepalive: true, signal: controller.signal,
       headers,
       body: JSON.stringify(activity),
     });
+    if (response.status === 401) {
+      forgetPersonaSession(userId);
+      await ensurePersonaSession(userId);
+      const renewed = currentPersonaProof(userId);
+      if (renewed) headers["X-Persona"] = renewed;
+      else delete headers["X-Persona"];
+      response = await fetch(`${apiBase()}/api/telemetry/activity`, {
+        method: "POST", keepalive: true, signal: controller.signal,
+        headers,
+        body: JSON.stringify(activity),
+      });
+    }
     return response.ok ? "sent" : response.status === 429 || response.status >= 500 ? "retry" : "drop";
   } catch {
     return "retry";

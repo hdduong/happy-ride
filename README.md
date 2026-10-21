@@ -17,6 +17,6 @@ Motorbike ride demo with an ASP.NET Core API and Next.js rider and driver screen
 - [`docs/observability.md`](docs/observability.md) — structured logs, trace IDs, Azure activation, queries, and volume/retention settings
 - [`docs/build-plan.md`](docs/build-plan.md) — target MVP architecture and remaining integrations
 
-Run the API with `dotnet run --project src/GrabBike.Api --launch-profile http`. In `web/`, run `npm ci` and `npm run dev`. Open the user picker at `http://localhost:3000`, or use the seeded rider and driver links in `AGENTS.md`.
+Run the API with `dotnet run --project src/GrabBike.Api --launch-profile http`. In `web/`, run `npm ci` and `npm run dev`. Open the user picker at `http://localhost:3000`, or use the seeded rider and driver links in `AGENTS.md`. The page calls the Next.js server, which calls the API. Locally that call has no Entra token. In Azure, set `AZURE_TENANT_ID`, `AZURE_API_CLIENT_ID`, and `AZURE_CLIENT_SECRET` so the API requires an application token and the web server attaches it.
 
 Validate with `dotnet test happy-ride.sln --configuration Release`, then `npm test` and `npm run build` in `web/`. For the two-browser ride test, run `npm ci`, `npx playwright install chromium`, and `npm test` in `e2e/`.

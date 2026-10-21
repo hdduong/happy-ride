@@ -1,0 +1,96 @@
+import { apiOrigin, appAccessToken, settingsFromEnv } from "./appToken";
+import { openPersona } from "./persona";
+
+const REQUEST_SKIP = new Set([
+  "host",
+  "connection",
+  "content-length",
+  "transfer-encoding",
+  "keep-alive",
+  "upgrade",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "authorization",
+  "cookie",
+  "x-persona",
+]);
+
+const RESPONSE_SKIP = new Set(["transfer-encoding", "content-encoding", "content-length", "connection", "set-cookie"]);
+
+export function isForwardedPath(path: string): boolean {
+  return path === "/api" || path.startsWith("/api/") || path === "/hubs" || path.startsWith("/hubs/");
+}
+
+export function allowsAnonymousBootstrap(method: string, path: string): boolean {
+  return method === "GET" && (path === "/api/dev/users" || path === "/api/map-config");
+}
+
+export function bindPersonaQuery(url: URL, actor: string): void {
+  for (const key of [...url.searchParams.keys()]) {
+    if (key.toLowerCase() === "userid") url.searchParams.delete(key);
+  }
+  url.searchParams.set("userId", actor);
+}
+
+export function forwardedHeaders(incoming: Headers, token: string | null): Headers {
+  const headers = new Headers();
+  incoming.forEach((value, key) => {
+    if (REQUEST_SKIP.has(key.toLowerCase())) return;
+    headers.append(key, value);
+  });
+  if (token) headers.set("authorization", `Bearer ${token}`);
+  return headers;
+}
+
+export async function proxyApi(request: Request, segments: string[]): Promise<Response> {
+  if (segments.length === 0 || segments.some((segment) => segment === "" || segment === "." || segment === ".." || segment.includes("/")))
+    return new Response(null, { status: 404 });
+
+  const path = `/${segments.join("/")}`;
+  if (!isForwardedPath(path)) return new Response(null, { status: 404 });
+
+  const settings = settingsFromEnv();
+  let token: string | null = null;
+  const headers = forwardedHeaders(request.headers, null);
+  if (settings) {
+    const actor = openPersona(request.headers.get("x-persona") ?? undefined, settings.clientSecret);
+    if (!actor && !allowsAnonymousBootstrap(request.method, path)) return new Response(null, { status: 401 });
+    if (actor) headers.set("x-user-id", actor);
+    try {
+      token = await appAccessToken(settings);
+    } catch {
+      return Response.json({ error: "The API token could not be acquired." }, { status: 502 });
+    }
+    headers.set("authorization", `Bearer ${token}`);
+  }
+
+  const upstreamUrl = new URL(`${apiOrigin()}${path}${new URL(request.url).search}`);
+  const actor = headers.get("x-user-id");
+  if (settings && actor) bindPersonaQuery(upstreamUrl, actor);
+  const init: RequestInit & { duplex?: "half" } = {
+    method: request.method,
+    headers,
+    redirect: "manual",
+    signal: request.signal,
+  };
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = request.body;
+    init.duplex = "half";
+  }
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(upstreamUrl, init);
+  } catch (error) {
+    if (request.signal.aborted) return new Response(null, { status: 499 });
+    throw error;
+  }
+  const responseHeaders = new Headers();
+  upstream.headers.forEach((value, key) => {
+    if (RESPONSE_SKIP.has(key.toLowerCase())) return;
+    responseHeaders.append(key, value);
+  });
+  return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+}

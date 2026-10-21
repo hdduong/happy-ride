@@ -6,6 +6,7 @@ using GrabBike.Api.Features.Drivers;
 using GrabBike.Api.Features.Maps;
 using GrabBike.Api.Features.Realtime;
 using GrabBike.Api.Features.Rides;
+using GrabBike.Api.Infrastructure.Auth;
 using GrabBike.Api.Infrastructure.Observability;
 using GrabBike.Api.Infrastructure.Persistence;
 using GrabBike.Api.Infrastructure.Persistence.Repositories;
@@ -27,13 +28,17 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
+var entraConfigured = EntraApiAuthentication.IsConfigured(builder.Configuration);
 builder.Services.AddSwaggerGen(options =>
 {
+    var description = "Seeded rider HCMR01 Rider01: 11111111-1111-1111-1111-111111111111. Driver HCMD01 Driver01: 33333333-3333-3333-3333-333333333333. Send the id in the X-User-Id header.";
+    if (entraConfigured)
+        description += " Also send Authorization: Bearer with the Entra application token.";
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "Happy Ride API",
         Version = "v1",
-        Description = "Seeded rider HCMR01 Rider01: 11111111-1111-1111-1111-111111111111. Driver HCMD01 Driver01: 33333333-3333-3333-3333-333333333333. Send the id in the X-User-Id header.",
+        Description = description,
     });
     options.AddSecurityDefinition("X-User-Id", new OpenApiSecurityScheme
     {
@@ -42,9 +47,25 @@ builder.Services.AddSwaggerGen(options =>
         In = ParameterLocation.Header,
         Description = "Persona id from GET /api/dev/users.",
     });
-    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    if (entraConfigured)
     {
-        [new OpenApiSecuritySchemeReference("X-User-Id", document)] = [],
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "Entra application access token. Required for /api and /hubs when AzureAd is configured.",
+        });
+    }
+    options.AddSecurityRequirement(document =>
+    {
+        var requirement = new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("X-User-Id", document)] = [],
+        };
+        if (entraConfigured)
+            requirement[new OpenApiSecuritySchemeReference("Bearer", document)] = [];
+        return requirement;
     });
 });
 
@@ -67,6 +88,8 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
+
+builder.AddEntraApiTokens();
 
 builder.Services.AddSignalR().AddJsonProtocol(options =>
 {
@@ -165,6 +188,7 @@ app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescripti
 app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
 
 app.UseCors();
+app.UseEntraApiTokens();
 app.UseMiddleware<DevIdentityMiddleware>();
 app.UseMiddleware<ActorTelemetryMiddleware>();
 app.UseRateLimiter();
