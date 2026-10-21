@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace GrabBike.Api.Tests;
 
@@ -27,7 +28,7 @@ public class RideFlowTests(PostgresFixture postgres)
     [Fact]
     public async Task OpenApi_document_feeds_swagger_and_scalar()
     {
-        await using var fixture = new ApiFactory(Database);
+        await using var fixture = new ApiFactory(Database, environment: Environments.Production);
         var client = fixture.CreateClient();
 
         var document = await client.GetStringAsync("/swagger/v1/swagger.json");
@@ -46,6 +47,9 @@ public class RideFlowTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.OK, scalar.StatusCode);
         var page = await scalar.Content.ReadAsStringAsync();
         Assert.Contains("swagger/v1/swagger.json", page);
+
+        var swagger = await client.GetAsync("/swagger/index.html");
+        Assert.Equal(HttpStatusCode.OK, swagger.StatusCode);
     }
 
     [Fact]
@@ -431,11 +435,13 @@ public class RideFlowTests(PostgresFixture postgres)
         private readonly string _databaseName;
         private readonly string _connectionString;
         private readonly IRideEventPublisher? _publisher;
+        private readonly string? _environment;
 
-        public ApiFactory(string adminConnection, IRideEventPublisher? publisher = null)
+        public ApiFactory(string adminConnection, IRideEventPublisher? publisher = null, string? environment = null)
         {
             _adminConnection = adminConnection;
             _publisher = publisher;
+            _environment = environment;
             _databaseName = "hr" + Guid.NewGuid().ToString("N");
             _connectionString = new Npgsql.NpgsqlConnectionStringBuilder(adminConnection) { Database = _databaseName }.ConnectionString;
             using var connection = new Npgsql.NpgsqlConnection(adminConnection);
@@ -453,6 +459,8 @@ public class RideFlowTests(PostgresFixture postgres)
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            if (_environment is not null)
+                builder.UseEnvironment(_environment);
             builder.UseSetting("APPLICATIONINSIGHTS_CONNECTION_STRING", "");
             builder.UseSetting("ConnectionStrings:GrabBike", _connectionString);
             builder.UseSetting("Dispatch:Bus", "InMemory");

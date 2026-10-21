@@ -153,18 +153,16 @@ await using (var scope = app.Services.CreateAsyncScope())
 
 app.UseApplicationObservability();
 
-if (app.Environment.IsDevelopment())
+// One Swashbuckle document, generated from the controllers. Swagger UI and Scalar both render it.
+// These routes stay available in Production; they are not a Development-only convenience.
+app.UseSwagger();
+app.UseSwaggerUI();
+app.MapScalarApiReference(options =>
 {
-    // One Swashbuckle document, generated from the controllers. Swagger UI and Scalar both render it.
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    app.MapScalarApiReference(options =>
-    {
-        options.WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json");
-    });
-    app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
-    app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
-}
+    options.WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json");
+});
+app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
+app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
 
 app.UseCors();
 app.UseMiddleware<DevIdentityMiddleware>();
