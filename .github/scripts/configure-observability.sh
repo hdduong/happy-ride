@@ -11,6 +11,27 @@ WORKSPACE="${AZURE_LOG_ANALYTICS_WORKSPACE:-log-grabbike}"
 RETENTION_DAYS="${AZURE_LOG_RETENTION_DAYS:-30}"
 DAILY_CAP_GB="${AZURE_LOG_DAILY_CAP_GB:-1}"
 
+apply_api_settings() {
+  local connection_string="$1"
+  if [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
+    local masked_value="${connection_string//'%'/'%25'}"
+    masked_value="${masked_value//$'\r'/'%0D'}"
+    masked_value="${masked_value//$'\n'/'%0A'}"
+    printf '::add-mask::%s\n' "$masked_value"
+  fi
+
+  # Never echo this value or the settings response. The web app receives no telemetry credentials.
+  az webapp config appsettings set --resource-group "$RG" --name "$API_APP" \
+    --settings APPLICATIONINSIGHTS_CONNECTION_STRING="$connection_string" \
+      OTEL_SERVICE_NAME="happy-ride-api" --output none
+}
+
+if [ -n "${APPLICATIONINSIGHTS_CONNECTION_STRING:-}" ]; then
+  apply_api_settings "$APPLICATIONINSIGHTS_CONNECTION_STRING"
+  echo "API telemetry configured from the supplied connection string."
+  exit 0
+fi
+
 # Listing distinguishes an absent resource from authorization/network errors: errors stop deployment.
 insights_id="$(az resource list --resource-group "$RG" --name "$INSIGHTS" \
   --resource-type Microsoft.Insights/components --query '[0].id' --output tsv)"
@@ -71,13 +92,6 @@ if [ -z "$connection_string" ]; then
   echo "Application Insights returned an empty connection string." >&2
   exit 1
 fi
-if [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
-  printf '::add-mask::%s\n' "$connection_string"
-fi
-
-# Never echo this value or the settings response. The web app receives no telemetry credentials.
-az webapp config appsettings set --resource-group "$RG" --name "$API_APP" \
-  --settings APPLICATIONINSIGHTS_CONNECTION_STRING="$connection_string" \
-    OTEL_SERVICE_NAME="happy-ride-api" --output none
+apply_api_settings "$connection_string"
 unset connection_string
 echo "API telemetry configured: $INSIGHTS (workspace: $workspace_id)"

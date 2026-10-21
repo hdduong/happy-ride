@@ -7,7 +7,7 @@
 
 A merge into `main` runs **Build** and **CI**. Build compiles the API and the web app. CI runs the API tests and the browser ride test. When both are green, CI opens a deployment request. Azure changes only after you open [Deployment](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml), click **Run workflow**, check **Deploy to Azure production**, and click the green **Run workflow** button.
 
-That button creates or updates one Linux B1 App Service plan, `plan-grabbike`, in `rg-grabbike-dev` (shared by the API and the web). It also creates or reuses Application Insights and a Log Analytics workspace for API telemetry. A successful deploy tags `v1.0.<commit count>` and updates the version badge. Monitoring ingestion is usage-billed; see the defaults and activation steps in [`docs/observability.md`](docs/observability.md).
+That button creates or updates one Linux B1 App Service plan, `plan-grabbike`, in `rg-grabbike-dev` (shared by the API and the web). For API telemetry, it applies the optional `APPLICATIONINSIGHTS_CONNECTION_STRING` GitHub secret on every deployment; without that secret, it creates or reuses Application Insights and a Log Analytics workspace and reads the connection string from Azure. A successful deploy tags `v1.0.<commit count>` and updates the version badge. Monitoring ingestion is usage-billed; see the defaults and activation steps in [`docs/observability.md`](docs/observability.md).
 
 Motorbike ride demo with an ASP.NET Core API and Next.js rider and driver screens. The current demo uses SQLite, seeded users, simulated driver movement, and fake places/routes.
 
