@@ -27,6 +27,13 @@ export function allowsAnonymousBootstrap(method: string, path: string): boolean 
   return method === "GET" && path === "/api/dev/users";
 }
 
+export function bindPersonaQuery(url: URL, actor: string): void {
+  for (const key of [...url.searchParams.keys()]) {
+    if (key.toLowerCase() === "userid") url.searchParams.delete(key);
+  }
+  url.searchParams.set("userId", actor);
+}
+
 export function forwardedHeaders(incoming: Headers, token: string | null): Headers {
   const headers = new Headers();
   incoming.forEach((value, key) => {
@@ -61,7 +68,7 @@ export async function proxyApi(request: Request, segments: string[]): Promise<Re
 
   const upstreamUrl = new URL(`${apiOrigin()}${path}${new URL(request.url).search}`);
   const actor = headers.get("x-user-id");
-  if (settings && actor && upstreamUrl.searchParams.has("userId")) upstreamUrl.searchParams.set("userId", actor);
+  if (settings && actor) bindPersonaQuery(upstreamUrl, actor);
   const init: RequestInit & { duplex?: "half" } = {
     method: request.method,
     headers,

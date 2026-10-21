@@ -148,15 +148,6 @@ jobs:
           if [ -n "${AZURE_TENANT_ID:-}" ] && [ -n "${AZURE_API_CLIENT_ID:-}" ] && [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
             client_id="${AZURE_CLIENT_ID:-$AZURE_API_CLIENT_ID}"
             scope="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
-            audience="${scope%/.default}"
-            az webapp config appsettings set \
-              --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
-              --name "${AZURE_API_APP:-app-grabbike-api}" \
-              --settings \
-                AzureAd__TenantId="$AZURE_TENANT_ID" \
-                AzureAd__ClientId="$AZURE_API_CLIENT_ID" \
-                AzureAd__Audience="$audience" \
-                AzureAd__AllowedClientId="$client_id"
             az webapp config appsettings set \
               --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
               --name "${AZURE_WEB_APP:-app-grabbike-web}" \
@@ -192,17 +183,41 @@ jobs:
           fi
           rm -f infra-outputs.json
 
-      - name: Deploy the API
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: app-grabbike-api
-          package: publish/api
-
       - name: Deploy the web app
         uses: azure/webapps-deploy@v3
         with:
           app-name: app-grabbike-web
           package: web/.next/standalone
+
+      - name: Require the Entra token on the API
+        env:
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_API_SCOPE: ${{ vars.AZURE_API_SCOPE }}
+        run: |
+          if [ -z "${AZURE_TENANT_ID:-}" ] || [ -z "${AZURE_API_CLIENT_ID:-}" ] || [ -z "${AZURE_CLIENT_SECRET:-}" ]; then
+            echo "Entra application token is not configured. The API keeps the cleared settings from the previous step."
+            exit 0
+          fi
+          client_id="${AZURE_CLIENT_ID:-$AZURE_API_CLIENT_ID}"
+          scope="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
+          audience="${scope%/.default}"
+          az webapp config appsettings set \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name "${AZURE_API_APP:-app-grabbike-api}" \
+            --settings \
+              AzureAd__TenantId="$AZURE_TENANT_ID" \
+              AzureAd__ClientId="$AZURE_API_CLIENT_ID" \
+              AzureAd__Audience="$audience" \
+              AzureAd__AllowedClientId="$client_id"
+
+      - name: Deploy the API
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: app-grabbike-api
+          package: publish/api
 
       - name: Publish the version
         env:

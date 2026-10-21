@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { appAccessToken, clearAppTokenCache, settingsFromEnv } from "../shared/api/appToken.ts";
-import { allowsAnonymousBootstrap, forwardedHeaders, isForwardedPath } from "../shared/api/proxy.ts";
+import { allowsAnonymousBootstrap, bindPersonaQuery, forwardedHeaders, isForwardedPath } from "../shared/api/proxy.ts";
 import { openPersona, sealPersona } from "../shared/api/persona.ts";
 
 test("missing Entra settings leave the local demo without a token", () => {
@@ -61,6 +61,16 @@ test("the proxy only forwards API and hub paths", () => {
   assert.equal(isForwardedPath("/api/dev/users"), true);
   assert.equal(isForwardedPath("/hubs/ride/negotiate"), true);
   assert.equal(isForwardedPath("/swagger"), false);
+});
+
+test("the hub query keeps the sealed persona and drops any other user id key", () => {
+  const actor = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const url = new URL(`http://api/hubs/ride?UserId=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb&userId=cccccccc-cccc-cccc-cccc-cccccccccccc&appSessionId=s`);
+  bindPersonaQuery(url, actor);
+  const userKeys = [...url.searchParams.keys()].filter((key) => key.toLowerCase() === "userid");
+  assert.deepEqual(userKeys, ["userId"]);
+  assert.equal(url.searchParams.get("userId"), actor);
+  assert.equal(url.searchParams.get("appSessionId"), "s");
 });
 
 test("only the user list can be read before a persona cookie exists", () => {
