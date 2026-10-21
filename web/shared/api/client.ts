@@ -73,6 +73,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (response.status === 401 && actor) {
     forgetPersonaSession(actor);
     await ensurePersonaSession(actor);
+    const renewed = currentPersonaProof();
+    if (renewed) headers.set("X-Persona", renewed);
+    else headers.delete("X-Persona");
     response = await send(path, options.method ?? "GET", headers, body);
   }
 

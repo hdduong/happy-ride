@@ -41,6 +41,7 @@ async function send(userId: string, activity: Activity): Promise<"sent" | "retry
       await ensurePersonaSession(userId);
       const renewed = currentPersonaProof();
       if (renewed) headers["X-Persona"] = renewed;
+      else delete headers["X-Persona"];
       response = await fetch(`${apiBase()}/api/telemetry/activity`, {
         method: "POST", keepalive: true, signal: controller.signal,
         headers,
