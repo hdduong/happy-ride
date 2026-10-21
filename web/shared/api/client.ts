@@ -1,8 +1,7 @@
-export function apiBase(): string {
-  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-  const base = configured && configured.length > 0 ? configured : "http://localhost:5080";
-  return base.replace(/\/+$/, "");
-}
+import { apiBase } from "./base";
+import { getActivityClient } from "../telemetry/browser";
+import type { Correlation } from "../telemetry/activity";
+export { apiBase } from "./base";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -37,11 +36,18 @@ type RequestOptions = {
   method?: string;
   userId?: string | null;
   body?: unknown;
+  telemetry?: Correlation;
 };
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers();
   if (options.userId) headers.set("X-User-Id", options.userId);
+  const telemetry = options.telemetry ?? getActivityClient(options.userId)?.correlation();
+  if (telemetry) {
+    headers.set("X-App-Session-Id", telemetry.appSessionId);
+    if (telemetry.activityId) headers.set("X-Activity-Id", telemetry.activityId);
+    if (telemetry.rideId) headers.set("X-Ride-Id", telemetry.rideId);
+  }
   let body: string | undefined;
   if (options.body !== undefined) {
     headers.set("Content-Type", "application/json");
