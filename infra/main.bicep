@@ -23,6 +23,17 @@ resource dispatchQueue 'Microsoft.ServiceBus/namespaces/queues@2022-10-01-previe
   }
 }
 
+resource dispatchAccess 'Microsoft.ServiceBus/namespaces/queues/authorizationRules@2022-10-01-preview' = {
+  parent: dispatchQueue
+  name: 'dispatch-worker'
+  properties: {
+    rights: [
+      'Listen'
+      'Send'
+    ]
+  }
+}
+
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   name: 'psql-grabbike-${nameSuffix}'
   location: location
@@ -79,6 +90,7 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-0
 }
 
 output postgresHost string = postgres.properties.fullyQualifiedDomainName
-output serviceBusConnectionString string = listKeys('${serviceBus.id}/authorizationRules/RootManageSharedAccessKey', serviceBus.apiVersion).primaryConnectionString
+@secure()
+output serviceBusConnectionString string = listKeys(dispatchAccess.id, dispatchAccess.apiVersion).primaryConnectionString
 output dispatchQueueName string = dispatchQueue.name
 output apiAppName string = apiAppName
