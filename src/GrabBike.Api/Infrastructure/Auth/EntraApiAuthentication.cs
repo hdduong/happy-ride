@@ -47,7 +47,7 @@ public static class EntraApiAuthentication
 
                         var caller = context.Principal?.FindFirst("azp")?.Value
                             ?? context.Principal?.FindFirst("appid")?.Value;
-                        if (!string.Equals(caller, allowed, StringComparison.Ordinal))
+                        if (!string.Equals(caller, allowed, StringComparison.OrdinalIgnoreCase))
                             context.Fail("The token is for a different application.");
                         return Task.CompletedTask;
                     },

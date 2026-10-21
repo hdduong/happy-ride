@@ -42,6 +42,18 @@ public class EntraTokenTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Configured_api_accepts_the_application_id_in_either_case()
+    {
+        await using var factory = new TokenFactory(postgres.Container.GetConnectionString(), allowedClientId: "WEB-APP");
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token("web-app", $"api://{ClientId}"));
+
+        var response = await client.GetAsync("/api/dev/users");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Configured_api_rejects_a_token_for_another_audience_or_caller()
     {
         await using var factory = new TokenFactory(postgres.Container.GetConnectionString(), allowedClientId: "web-app");
