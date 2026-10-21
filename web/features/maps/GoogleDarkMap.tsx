@@ -33,7 +33,7 @@ export function GoogleDarkMap({
         disableDefaultUI
         style={{ width: "100%", height: "100%" }}
       >
-        <GoogleOverlays center={center} route={route} markers={markers} pulse={pulse} />
+        <GoogleOverlays center={center} zoom={zoom} route={route} markers={markers} pulse={pulse} />
       </Map>
     </APIProvider>
   );
@@ -41,11 +41,13 @@ export function GoogleDarkMap({
 
 function GoogleOverlays({
   center,
+  zoom,
   route,
   markers,
   pulse,
 }: {
   center: LatLng;
+  zoom: number;
   route: LatLng[];
   markers: MapMarker[];
   pulse: LatLng | null;
@@ -88,7 +90,7 @@ function GoogleOverlays({
     if (points.length < 2) {
       const only = points[0] ?? center;
       map.setCenter(only);
-      map.setZoom(15);
+      map.setZoom(zoom);
     } else {
       for (const point of points) bounds.extend(point);
       if (!bounds.isEmpty()) map.fitBounds(bounds, { top: 80, right: 48, bottom: 280, left: 48 });
@@ -98,6 +100,6 @@ function GoogleOverlays({
       line.setMap(null);
       pulseCircle?.setMap(null);
     };
-  }, [map, center, route, markers, pulse]);
+  }, [map, center, zoom, route, markers, pulse]);
   return null;
 }

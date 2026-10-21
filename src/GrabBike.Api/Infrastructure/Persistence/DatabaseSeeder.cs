@@ -57,6 +57,13 @@ public static class DatabaseSeeder
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    // Positions that existed before the Ba Đình placement. Move a driver only while it is still parked there.
+    private static readonly Dictionary<string, (double Lat, double Lng)> PreviousSeeds = new()
+    {
+        ["99999999-9999-9999-9999-999999999999"] = (21.02980, 105.85360),
+        ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"] = (21.02770, 105.85110),
+    };
+
     private static async Task RenameDemoPeopleAsync(AppDbContext db, CancellationToken cancellationToken)
     {
         foreach (var person in People)
@@ -68,9 +75,16 @@ public static class DatabaseSeeder
             if (person.Role != UserRole.Driver)
                 continue;
             var driver = await db.Drivers.FindAsync([id], cancellationToken);
-            if (driver is null || person.Lat is not double lat || person.Lng is not double lng)
+            if (driver is null)
                 continue;
             driver.Name = person.Name;
+            if (driver.CurrentRideId is not null
+                || driver.Status == DriverStatus.OnTrip
+                || person.Lat is not double lat
+                || person.Lng is not double lng
+                || !PreviousSeeds.TryGetValue(person.Id, out var previous)
+                || !Near(driver.Lat, driver.Lng, previous.Lat, previous.Lng))
+                continue;
             driver.Lat = lat;
             driver.Lng = lng;
         }
@@ -122,6 +136,9 @@ public static class DatabaseSeeder
             Lng = lng,
         });
     }
+
+    private static bool Near(double lat, double lng, double otherLat, double otherLng) =>
+        Math.Abs(lat - otherLat) < 0.00001 && Math.Abs(lng - otherLng) < 0.00001;
 
     private sealed record Persona(
         string Id,
