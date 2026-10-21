@@ -198,7 +198,6 @@ jobs:
         env:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
-          AZURE_WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
           AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
           AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -211,7 +210,6 @@ jobs:
           fi
           rg="${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}"
           api="${AZURE_API_APP:-app-grabbike-api}"
-          web="${AZURE_WEB_APP:-app-grabbike-web}"
           setting() {
             az webapp config appsettings list --resource-group "$rg" --name "$1" --query "[?name=='$2'].value | [0]" -o tsv
           }
@@ -261,6 +259,35 @@ jobs:
               fi
             fi
           fi
+
+      - name: Deploy the web app
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEB_APP_NAME || 'app-grabbike-web' }}
+          package: web/.next/standalone
+
+      - name: Apply the web Entra settings
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_API_CLIENT_ID: ${{ vars.AZURE_API_CLIENT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_API_SCOPE: ${{ vars.AZURE_API_SCOPE }}
+        run: |
+          if [ -z "${AZURE_TENANT_ID:-}" ] || [ -z "${AZURE_API_CLIENT_ID:-}" ] || [ -z "${AZURE_CLIENT_SECRET:-}" ]; then
+            echo "Entra application token is not configured."
+            exit 0
+          fi
+          rg="${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}"
+          web="${AZURE_WEB_APP:-app-grabbike-web}"
+          setting() {
+            az webapp config appsettings list --resource-group "$rg" --name "$1" --query "[?name=='$2'].value | [0]" -o tsv
+          }
+          same() { [ "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')" ]; }
+          new_allowed="${AZURE_CLIENT_ID:-$AZURE_API_CLIENT_ID}"
+          new_scope="${AZURE_API_SCOPE:-api://${AZURE_API_CLIENT_ID}/.default}"
           web_tenant="$(setting "$web" AZURE_TENANT_ID)"
           web_client="$(setting "$web" AZURE_CLIENT_ID)"
           web_secret="$(setting "$web" AZURE_CLIENT_SECRET)"
@@ -279,12 +306,6 @@ jobs:
                 AZURE_API_CLIENT_ID="$AZURE_API_CLIENT_ID" \
                 AZURE_API_SCOPE="$new_scope"
           fi
-
-      - name: Deploy the web app
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ vars.AZURE_WEB_APP_NAME || 'app-grabbike-web' }}
-          package: web/.next/standalone
 
       - name: Keep only the new Entra identity
         env:
