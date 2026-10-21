@@ -49,11 +49,12 @@ test("the server caches the application token and replaces any caller token", as
   assert.equal(headers.get("x-user-id"), "an");
 });
 
-test("a persona cookie is accepted only with the server secret", () => {
-  const sealed = sealPersona("11111111-1111-1111-1111-111111111111", "server-secret");
-  assert.equal(openPersona(sealed, "server-secret"), "11111111-1111-1111-1111-111111111111");
+test("a persona proof is accepted only with the server secret and before it expires", () => {
+  const id = "11111111-1111-1111-1111-111111111111";
+  const sealed = sealPersona(id, "server-secret", Math.floor(Date.now() / 1000) + 3600);
+  assert.equal(openPersona(sealed, "server-secret"), id);
   assert.equal(openPersona(sealed, "other-secret"), null);
-  assert.equal(openPersona("11111111-1111-1111-1111-111111111111.forged", "server-secret"), null);
+  assert.equal(openPersona(sealPersona(id, "server-secret", Math.floor(Date.now() / 1000) - 5), "server-secret"), null);
 });
 
 test("the proxy only forwards API and hub paths", () => {

@@ -1,5 +1,5 @@
 import { apiOrigin, appAccessToken, settingsFromEnv } from "@/shared/api/appToken";
-import { personaCookieName, sealPersona } from "@/shared/api/persona";
+import { sealPersona } from "@/shared/api/persona";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,11 +29,6 @@ export async function POST(request: Request): Promise<Response> {
   const list = (await users.json()) as { id?: string }[];
   if (!list.some((user) => user.id === userId)) return Response.json({ error: "Unknown user" }, { status: 404 });
 
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Set-Cookie": `${personaCookieName}=${sealPersona(userId, settings.clientSecret)}; HttpOnly; Path=/; Max-Age=28800; SameSite=Lax${secure}`,
-    },
-  });
+  const expiresAt = Math.floor(Date.now() / 1000) + 8 * 60 * 60;
+  return Response.json({ proof: sealPersona(userId, settings.clientSecret, expiresAt) });
 }

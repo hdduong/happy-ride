@@ -1,5 +1,5 @@
 import { captureUserId } from "@/features/identity/storage";
-import { ensurePersonaSession, forgetPersonaSession } from "./personaSession";
+import { currentPersonaProof, ensurePersonaSession, forgetPersonaSession } from "./personaSession";
 import { apiBase } from "./base";
 import { getActivityClient } from "../telemetry/browser";
 import type { Correlation } from "../telemetry/activity";
@@ -54,6 +54,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const actor = options.userId ?? (typeof window === "undefined" ? null : captureUserId());
   if (actor) await ensurePersonaSession(actor);
   const headers = new Headers();
+  const proof = currentPersonaProof();
+  if (proof) headers.set("X-Persona", proof);
   if (options.userId) headers.set("X-User-Id", options.userId);
   const telemetry = options.telemetry ?? getActivityClient(options.userId)?.correlation();
   if (telemetry) {

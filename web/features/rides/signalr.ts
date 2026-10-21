@@ -1,11 +1,26 @@
-import { HttpTransportType, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
+import { DefaultHttpClient, HttpTransportType, HubConnectionBuilder, LogLevel, NullLogger, type HttpRequest, type HttpResponse } from "@microsoft/signalr";
 import { apiBase } from "@/shared/api/client";
-import { ensurePersonaSession } from "@/shared/api/personaSession";
+import { currentPersonaProof, ensurePersonaSession } from "@/shared/api/personaSession";
 import { asLocation, asOffer, asOfferClosed, asRide } from "./parse";
 import { openConnection } from "./connectionLifecycle";
 import { observeConnectionActivity } from "./connectionActivity";
 import type { RideHandlers } from "./session";
 import type { ActivityClient } from "@/shared/telemetry/activity";
+
+class PersonaHttpClient extends DefaultHttpClient {
+  public constructor() {
+    super(NullLogger.instance);
+  }
+
+  public send(request: HttpRequest): Promise<HttpResponse> {
+    const proof = currentPersonaProof();
+    if (proof) {
+      request.headers ??= {};
+      request.headers["X-Persona"] = proof;
+    }
+    return super.send(request);
+  }
+}
 
 export function openRideConnection(userId: string, handlers: RideHandlers, activity?: ActivityClient): () => void {
   let lifecycle: ReturnType<typeof observeConnectionActivity>;
@@ -17,6 +32,7 @@ export function openRideConnection(userId: string, handlers: RideHandlers, activ
         // A browser WebSocket cannot carry that server-only credential.
         transport: HttpTransportType.LongPolling,
         headers: { "X-User-Id": userId },
+        httpClient: new PersonaHttpClient(),
       })
       .withAutomaticReconnect()
       .configureLogging({

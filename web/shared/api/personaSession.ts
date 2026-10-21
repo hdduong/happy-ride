@@ -1,17 +1,36 @@
-let sessionUser: string | null = null;
-let sessionUntil = 0;
-const renewAfterMs = 7 * 60 * 60 * 1000;
+const proofKey = "happy-ride-persona-proof";
+const renewWithinMs = 60 * 60 * 1000;
+
+export function currentPersonaProof(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(proofKey);
+  } catch {
+    return null;
+  }
+}
 
 export function forgetPersonaSession(userId?: string): void {
-  if (!userId || sessionUser === userId) {
-    sessionUser = null;
-    sessionUntil = 0;
+  if (typeof window === "undefined") return;
+  const proof = currentPersonaProof();
+  if (!userId || !proof || proof.startsWith(`${userId}.`)) {
+    try {
+      sessionStorage.removeItem(proofKey);
+    } catch {
+      /* storage can be denied */
+    }
   }
+}
+
+function proofStillFresh(proof: string, userId: string): boolean {
+  const expiresAt = Number(proof.split(".")[1]);
+  return proof.startsWith(`${userId}.`) && Number.isFinite(expiresAt) && expiresAt * 1000 - Date.now() > renewWithinMs;
 }
 
 export async function ensurePersonaSession(userId: string): Promise<void> {
   if (typeof window === "undefined") return;
-  if (sessionUser === userId && Date.now() < sessionUntil) return;
+  const existing = currentPersonaProof();
+  if (existing && proofStillFresh(existing, userId)) return;
   const response = await fetch("/backend/session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -32,6 +51,12 @@ export async function ensurePersonaSession(userId: string): Promise<void> {
       : `Request failed (${response.status})`;
     throw new Error(detail);
   }
-  sessionUser = userId;
-  sessionUntil = Date.now() + renewAfterMs;
+  if (response.status === 204) return;
+  const body = (await response.json()) as { proof?: unknown };
+  if (typeof body.proof !== "string") throw new Error("The persona session was incomplete");
+  try {
+    sessionStorage.setItem(proofKey, body.proof);
+  } catch {
+    throw new Error("The persona session could not be stored");
+  }
 }

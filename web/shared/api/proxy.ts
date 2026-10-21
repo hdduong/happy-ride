@@ -1,5 +1,5 @@
 import { apiOrigin, appAccessToken, settingsFromEnv } from "./appToken";
-import { personaFromCookieHeader } from "./persona";
+import { openPersona } from "./persona";
 
 const REQUEST_SKIP = new Set([
   "host",
@@ -14,6 +14,7 @@ const REQUEST_SKIP = new Set([
   "trailer",
   "authorization",
   "cookie",
+  "x-persona",
 ]);
 
 const RESPONSE_SKIP = new Set(["transfer-encoding", "content-encoding", "content-length", "connection", "set-cookie"]);
@@ -47,7 +48,7 @@ export async function proxyApi(request: Request, segments: string[]): Promise<Re
   let token: string | null = null;
   const headers = forwardedHeaders(request.headers, null);
   if (settings) {
-    const actor = personaFromCookieHeader(request.headers.get("cookie"), settings.clientSecret);
+    const actor = openPersona(request.headers.get("x-persona") ?? undefined, settings.clientSecret);
     if (!actor && !allowsAnonymousBootstrap(request.method, path)) return new Response(null, { status: 401 });
     if (actor) headers.set("x-user-id", actor);
     try {

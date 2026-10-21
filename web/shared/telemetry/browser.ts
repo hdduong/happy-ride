@@ -1,5 +1,5 @@
 import { apiBase } from "../api/base";
-import { ensurePersonaSession, forgetPersonaSession } from "../api/personaSession";
+import { currentPersonaProof, ensurePersonaSession, forgetPersonaSession } from "../api/personaSession";
 import { createActivityClient, type Activity, type ActivityClient } from "./activity";
 
 type MountedSession = { client: ActivityClient; owners: number; detach: () => void };
@@ -29,6 +29,8 @@ async function send(userId: string, activity: Activity): Promise<"sent" | "retry
     };
     if (activity.rideId) headers["X-Ride-Id"] = activity.rideId;
     await ensurePersonaSession(userId);
+    const proof = currentPersonaProof();
+    if (proof) headers["X-Persona"] = proof;
     let response = await fetch(`${apiBase()}/api/telemetry/activity`, {
       method: "POST", keepalive: true, signal: controller.signal,
       headers,
@@ -37,6 +39,8 @@ async function send(userId: string, activity: Activity): Promise<"sent" | "retry
     if (response.status === 401) {
       forgetPersonaSession(userId);
       await ensurePersonaSession(userId);
+      const renewed = currentPersonaProof();
+      if (renewed) headers["X-Persona"] = renewed;
       response = await fetch(`${apiBase()}/api/telemetry/activity`, {
         method: "POST", keepalive: true, signal: controller.signal,
         headers,
