@@ -62,7 +62,7 @@ public sealed class BusinessLoggingTests
         Assert.Equal(accepted ? "Accepted" : "Searching", cancelled.Fields["FromStatus"]);
         Assert.Equal("Cancelled", cancelled.Fields["Status"]);
         if (!accepted)
-            Assert.Equal(3, fixture.Logs.Entries.Count(entry => entry.Event.Name == "DispatchOfferClosed"));
+            Assert.Equal(1, fixture.Logs.Entries.Count(entry => entry.Event.Name == "DispatchOfferClosed"));
     }
 
     [Fact]
@@ -77,11 +77,14 @@ public sealed class BusinessLoggingTests
         await fixture.Offers.DeclineAsync(DriverId, offerId, Now);
         await fixture.Offers.DeclineAsync(DriverId, offerId, Now);
 
-        var declined = Assert.Single(fixture.Logs.Entries);
-        Assert.Equal("OfferDeclined", declined.Event.Name);
+        var declined = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "OfferDeclined");
         Assert.Equal(rideId, declined.Fields["RideId"]);
         Assert.Equal(offerId, declined.Fields["OfferId"]);
         Assert.Equal(DriverId, declined.Fields["DriverId"]);
+        var nextRound = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchRoundStarted");
+        Assert.Equal(2, nextRound.Fields["Round"]);
+        Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchOfferCreated");
+        Assert.Equal(3, fixture.Logs.Entries.Count);
     }
 
     [Fact]
@@ -97,14 +100,16 @@ public sealed class BusinessLoggingTests
         await fixture.Expiry.AdvanceAsync(Now.AddSeconds(31));
         var round = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchRoundStarted");
         Assert.Equal(2, round.Fields["Round"]);
-        Assert.Equal(3, fixture.Logs.Entries.Count(entry => entry.Event.Name == "DispatchOfferClosed"));
+        Assert.Equal(1, fixture.Logs.Entries.Count(entry => entry.Event.Name == "DispatchOfferClosed"));
 
         await fixture.Expiry.AdvanceAsync(Now.AddSeconds(62));
+        await fixture.Expiry.AdvanceAsync(Now.AddSeconds(93));
+        await fixture.Expiry.AdvanceAsync(Now.AddSeconds(124));
         var exhausted = Assert.Single(fixture.Logs.Entries, entry => entry.Event.Name == "DispatchExhausted");
         Assert.Equal(rideId, exhausted.Fields["RideId"]);
         Assert.Equal("NoDriver", exhausted.Fields["Status"]);
         var count = fixture.Logs.Entries.Count;
-        await fixture.Expiry.AdvanceAsync(Now.AddSeconds(63));
+        await fixture.Expiry.AdvanceAsync(Now.AddSeconds(125));
         Assert.Equal(count, fixture.Logs.Entries.Count);
     }
 
