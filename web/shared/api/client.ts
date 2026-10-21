@@ -1,3 +1,4 @@
+import { captureUserId } from "@/features/identity/storage";
 import { apiBase } from "./base";
 import { getActivityClient } from "../telemetry/browser";
 import type { Correlation } from "../telemetry/activity";
@@ -39,7 +40,21 @@ type RequestOptions = {
   telemetry?: Correlation;
 };
 
+let sessionUser: string | null = null;
+
+export async function ensurePersonaSession(userId: string): Promise<void> {
+  if (typeof window === "undefined" || sessionUser === userId) return;
+  await fetch("/backend/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+  sessionUser = userId;
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const actor = options.userId ?? (typeof window === "undefined" ? null : captureUserId());
+  if (actor) await ensurePersonaSession(actor);
   const headers = new Headers();
   if (options.userId) headers.set("X-User-Id", options.userId);
   const telemetry = options.telemetry ?? getActivityClient(options.userId)?.correlation();

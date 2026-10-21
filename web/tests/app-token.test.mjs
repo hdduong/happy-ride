@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { appAccessToken, clearAppTokenCache, settingsFromEnv } from "../shared/api/appToken.ts";
 import { forwardedHeaders, isForwardedPath } from "../shared/api/proxy.ts";
+import { openPersona, sealPersona } from "../shared/api/persona.ts";
 
 test("missing Entra settings leave the local demo without a token", () => {
   assert.equal(settingsFromEnv({}), null);
@@ -46,6 +47,13 @@ test("the server caches the application token and replaces any caller token", as
   const headers = forwardedHeaders(new Headers({ Authorization: "Bearer stolen", "X-User-Id": "an" }), first);
   assert.equal(headers.get("authorization"), "Bearer app-token");
   assert.equal(headers.get("x-user-id"), "an");
+});
+
+test("a persona cookie is accepted only with the server secret", () => {
+  const sealed = sealPersona("11111111-1111-1111-1111-111111111111", "server-secret");
+  assert.equal(openPersona(sealed, "server-secret"), "11111111-1111-1111-1111-111111111111");
+  assert.equal(openPersona(sealed, "other-secret"), null);
+  assert.equal(openPersona("11111111-1111-1111-1111-111111111111.forged", "server-secret"), null);
 });
 
 test("the proxy only forwards API and hub paths", () => {

@@ -1,5 +1,5 @@
 import { HttpTransportType, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
-import { apiBase } from "@/shared/api/client";
+import { apiBase, ensurePersonaSession } from "@/shared/api/client";
 import { asLocation, asOffer, asOfferClosed, asRide } from "./parse";
 import { openConnection } from "./connectionLifecycle";
 import { observeConnectionActivity } from "./connectionActivity";
@@ -26,6 +26,8 @@ export function openRideConnection(userId: string, handlers: RideHandlers, activ
         },
       })
       .build();
+    const start = connection.start.bind(connection);
+    connection.start = () => ensurePersonaSession(userId).then(start);
 
     lifecycle = observeConnectionActivity(connection, isActive, activity);
 

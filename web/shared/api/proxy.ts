@@ -1,4 +1,5 @@
 import { apiOrigin, appAccessToken, settingsFromEnv } from "./appToken";
+import { personaFromCookieHeader } from "./persona";
 
 const REQUEST_SKIP = new Set([
   "host",
@@ -40,30 +41,44 @@ export async function proxyApi(request: Request, segments: string[]): Promise<Re
 
   const settings = settingsFromEnv();
   let token: string | null = null;
+  const headers = forwardedHeaders(request.headers, null);
   if (settings) {
+    const actor = personaFromCookieHeader(request.headers.get("cookie"), settings.clientSecret);
+    if (!actor) return new Response(null, { status: 401 });
+    headers.set("x-user-id", actor);
     try {
       token = await appAccessToken(settings);
     } catch {
       return Response.json({ error: "The API token could not be acquired." }, { status: 502 });
     }
+    headers.set("authorization", `Bearer ${token}`);
   }
 
-  const url = `${apiOrigin()}${path}${new URL(request.url).search}`;
+  const upstreamUrl = new URL(`${apiOrigin()}${path}${new URL(request.url).search}`);
+  const actor = headers.get("x-user-id");
+  if (settings && actor && upstreamUrl.searchParams.has("userId")) upstreamUrl.searchParams.set("userId", actor);
   const init: RequestInit & { duplex?: "half" } = {
     method: request.method,
-    headers: forwardedHeaders(request.headers, token),
+    headers,
     redirect: "manual",
+    signal: request.signal,
   };
   if (request.method !== "GET" && request.method !== "HEAD") {
     init.body = request.body;
     init.duplex = "half";
   }
 
-  const upstream = await fetch(url, init);
-  const headers = new Headers();
+  let upstream: Response;
+  try {
+    upstream = await fetch(upstreamUrl, init);
+  } catch (error) {
+    if (request.signal.aborted) return new Response(null, { status: 499 });
+    throw error;
+  }
+  const responseHeaders = new Headers();
   upstream.headers.forEach((value, key) => {
     if (RESPONSE_SKIP.has(key.toLowerCase())) return;
-    headers.append(key, value);
+    responseHeaders.append(key, value);
   });
-  return new Response(upstream.body, { status: upstream.status, headers });
+  return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
 }
