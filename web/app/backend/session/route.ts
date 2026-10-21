@@ -27,8 +27,9 @@ export async function POST(request: Request): Promise<Response> {
   });
   if (!users.ok) return Response.json({ error: "The user list could not be checked." }, { status: 502 });
   const list = (await users.json()) as { id?: string }[];
-  if (!list.some((user) => user.id === userId)) return Response.json({ error: "Unknown user" }, { status: 404 });
+  const match = list.find((user) => user.id?.toLowerCase() === userId.toLowerCase());
+  if (!match?.id) return Response.json({ error: "Unknown user" }, { status: 404 });
 
   const expiresAt = Math.floor(Date.now() / 1000) + 8 * 60 * 60;
-  return Response.json({ proof: sealPersona(userId, settings.clientSecret, expiresAt) });
+  return Response.json({ proof: sealPersona(match.id, settings.clientSecret, expiresAt) });
 }

@@ -13,7 +13,7 @@ export function currentPersonaProof(): string | null {
 export function forgetPersonaSession(userId?: string): void {
   if (typeof window === "undefined") return;
   const proof = currentPersonaProof();
-  if (!userId || !proof || proof.startsWith(`${userId}.`)) {
+  if (!userId || !proof || proof.toLowerCase().startsWith(`${userId.toLowerCase()}.`)) {
     try {
       sessionStorage.removeItem(proofKey);
     } catch {
@@ -23,8 +23,9 @@ export function forgetPersonaSession(userId?: string): void {
 }
 
 function proofStillFresh(proof: string, userId: string): boolean {
-  const expiresAt = Number(proof.split(".")[1]);
-  return proof.startsWith(`${userId}.`) && Number.isFinite(expiresAt) && expiresAt * 1000 - Date.now() > renewWithinMs;
+  const [storedId, expiresAt] = proof.split(".");
+  const expiry = Number(expiresAt);
+  return storedId.toLowerCase() === userId.toLowerCase() && Number.isFinite(expiry) && expiry * 1000 - Date.now() > renewWithinMs;
 }
 
 export async function ensurePersonaSession(userId: string): Promise<void> {
