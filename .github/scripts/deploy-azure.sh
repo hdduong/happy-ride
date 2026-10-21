@@ -83,7 +83,7 @@ az webapp config set \
   --resource-group "$RG" \
   --name "$WEB_APP" \
   --always-on true \
-  --startup-file 'node node_modules/next/dist/bin/next start --hostname 0.0.0.0 --port ${PORT:-8080}'
+  --startup-file "node server.js"
 
 az webapp config appsettings set \
   --resource-group "$RG" \
@@ -91,7 +91,10 @@ az webapp config appsettings set \
   --settings \
     SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
     ENABLE_ORYX_BUILD="false" \
-    WEBSITES_PORT="8080"
+    WEBSITES_PORT="8080" \
+    PORT="8080" \
+    HOSTNAME="0.0.0.0" \
+    WEBSITES_CONTAINER_START_TIME_LIMIT="600"
 
 az webapp update --resource-group "$RG" --name "$WEB_APP" --set httpsOnly=true >/dev/null
 

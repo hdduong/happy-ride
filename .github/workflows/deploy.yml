@@ -81,8 +81,8 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm prune --omit=dev
-          rm -rf .next/cache
+          mkdir -p .next/standalone/.next
+          cp -a .next/static .next/standalone/.next/static
 
       - name: Log in to Azure
         uses: azure/login@v2
@@ -102,7 +102,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: app-grabbike-web
-          package: web
+          package: web/.next/standalone
 
       - name: Publish the version
         env:
