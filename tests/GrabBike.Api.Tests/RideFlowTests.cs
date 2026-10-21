@@ -94,11 +94,9 @@ public class RideFlowTests(PostgresFixture postgres)
         Assert.Equal(JsonValueKind.Null, ride.GetProperty("driver").ValueKind);
 
         var khoaOffer = await PendingOffer(fixture.Client(Khoa), rideId);
-        var linhOffer = await PendingOffer(fixture.Client(Linh), rideId);
-        var ducOffer = await PendingOffer(fixture.Client(Duc), rideId);
         Assert.NotEqual(Guid.Empty, khoaOffer);
-        Assert.NotEqual(Guid.Empty, linhOffer);
-        Assert.NotEqual(Guid.Empty, ducOffer);
+        Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Linh), rideId));
+        Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Duc), rideId));
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Ha), rideId));
 
         var offers = await Read(await fixture.Client(Khoa).GetAsync("/api/offers/pending"), HttpStatusCode.OK);
@@ -119,10 +117,9 @@ public class RideFlowTests(PostgresFixture postgres)
         await using var fixture = new ApiFactory(Database);
         var rideId = await CreateRide(fixture.Client(An));
         var khoaOffer = await PendingOffer(fixture.Client(Khoa), rideId);
-        var linhOffer = await PendingOffer(fixture.Client(Linh), rideId);
 
         var first = fixture.Client(Khoa).PostAsync($"/api/offers/{khoaOffer}/accept", content: null);
-        var second = fixture.Client(Linh).PostAsync($"/api/offers/{linhOffer}/accept", content: null);
+        var second = fixture.Client(Khoa).PostAsync($"/api/offers/{khoaOffer}/accept", content: null);
         var responses = await Task.WhenAll(first, second);
 
         Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.OK));
@@ -134,7 +131,7 @@ public class RideFlowTests(PostgresFixture postgres)
         var view = await Read(winner, HttpStatusCode.OK);
         Assert.Equal("Accepted", view.GetProperty("status").GetString());
         var driverId = view.GetProperty("driver").GetProperty("userId").GetGuid();
-        Assert.Contains(driverId, new[] { Guid.Parse(Khoa), Guid.Parse(Linh) });
+        Assert.Equal(Guid.Parse(Khoa), driverId);
     }
 
     [Fact]
@@ -245,20 +242,22 @@ public class RideFlowTests(PostgresFixture postgres)
     {
         await using var fixture = new ApiFactory(Database);
         var rideId = await CreateRide(fixture.Client(An));
-        foreach (var driverId in new[] { Khoa, Linh, Duc })
+        var queue = new[] { Khoa, Linh, Duc, Ha };
+        for (var index = 0; index < queue.Length - 1; index++)
         {
-            var offerId = await PendingOffer(fixture.Client(driverId), rideId);
+            var offerId = await PendingOffer(fixture.Client(queue[index]), rideId);
             Assert.NotEqual(Guid.Empty, offerId);
-            await Read(await fixture.Client(driverId).PostAsync($"/api/offers/{offerId}/decline", content: null), HttpStatusCode.OK);
+            Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(queue[index + 1]), rideId));
+            await Read(await fixture.Client(queue[index]).PostAsync($"/api/offers/{offerId}/decline", content: null), HttpStatusCode.OK);
         }
 
         var haOffers = await Read(await fixture.Client(Ha).GetAsync("/api/offers/pending"), HttpStatusCode.OK);
         var haOffer = Assert.Single(haOffers.EnumerateArray(), item => item.GetProperty("rideId").GetGuid() == rideId);
-        Assert.Equal(2, haOffer.GetProperty("round").GetInt32());
+        Assert.Equal(4, haOffer.GetProperty("round").GetInt32());
 
         var ride = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
         Assert.Equal("Searching", ride.GetProperty("status").GetString());
-        Assert.Equal(2, ride.GetProperty("round").GetInt32());
+        Assert.Equal(4, ride.GetProperty("round").GetInt32());
     }
 
     [Fact]
@@ -279,6 +278,7 @@ public class RideFlowTests(PostgresFixture postgres)
         var ride = await Read(await fixture.Client(Nam).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
         Assert.Equal("Searching", ride.GetProperty("status").GetString());
         Assert.NotEqual(Guid.Empty, await PendingOffer(fixture.Client("99999999-9999-9999-9999-999999999999"), rideId));
+        Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), rideId));
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), rideId));
     }
 
@@ -331,19 +331,22 @@ public class RideFlowTests(PostgresFixture postgres)
         {
             var expiry = scope.ServiceProvider.GetRequiredService<IDispatchExpiryService>();
             var events = await expiry.AdvanceAsync(firstExpiry);
-            Assert.Equal(3, events.OfType<OutboundEvent.OfferClosed>().Count());
+            Assert.Single(events.OfType<OutboundEvent.OfferClosed>());
         }
 
         var roundTwo = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
         Assert.Equal("Searching", roundTwo.GetProperty("status").GetString());
         Assert.Equal(2, roundTwo.GetProperty("round").GetInt32());
-        Assert.NotEqual(Guid.Empty, await PendingOffer(fixture.Client(Ha), rideId));
+        Assert.NotEqual(Guid.Empty, await PendingOffer(fixture.Client(Linh), rideId));
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), rideId));
+        Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Ha), rideId));
 
         await using (var scope = fixture.Services.CreateAsyncScope())
         {
             var expiry = scope.ServiceProvider.GetRequiredService<IDispatchExpiryService>();
             await expiry.AdvanceAsync(firstExpiry.AddSeconds(31));
+            await expiry.AdvanceAsync(firstExpiry.AddSeconds(62));
+            await expiry.AdvanceAsync(firstExpiry.AddSeconds(93));
         }
 
         var exhausted = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
@@ -450,6 +453,7 @@ public class RideFlowTests(PostgresFixture postgres)
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseSetting("APPLICATIONINSIGHTS_CONNECTION_STRING", "");
             builder.UseSetting("ConnectionStrings:GrabBike", _connectionString);
             builder.UseSetting("Dispatch:Bus", "InMemory");
             if (_publisher is not null)

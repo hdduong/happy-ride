@@ -81,10 +81,14 @@ public sealed class OfferService(
                 continue;
 
             other.Status = OfferStatus.Closed;
-            result.Events.Add(new OutboundEvent.OfferClosed(other.DriverId, other.Id, "Taken"));
+            result.Events.Add(new OutboundEvent.OfferClosed(other.DriverId, other.Id, ride.Id, "Taken"));
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        logger.LogInformation(new EventId(2100, "OfferAccepted"),
+            "Offer {OfferId} accepted for ride {RideId} by driver {DriverId}; ride status {Status}",
+            offer.Id, ride.Id, driverId, ride.Status.ToString());
+        DispatchLogging.Committed(logger, result.Events);
         return result;
     }
 
@@ -98,7 +102,8 @@ public sealed class OfferService(
             return new OfferOutcome.Forbidden();
 
         var result = new OfferOutcome.Declined();
-        if (offer.Status == OfferStatus.Pending)
+        var changed = offer.Status == OfferStatus.Pending;
+        if (changed)
         {
             offer.Status = OfferStatus.Declined;
             var ride = await rides.FindAsync(offer.RideId, cancellationToken);
@@ -117,6 +122,13 @@ public sealed class OfferService(
             {
                 logger.LogWarning(exception, "Round {Round} for ride {RideId} was saved but its timeout was not scheduled", created.Round, created.RideId);
             }
+        }
+        if (changed)
+        {
+            logger.LogInformation(new EventId(2101, "OfferDeclined"),
+                "Offer {OfferId} declined for ride {RideId} by driver {DriverId}",
+                offer.Id, offer.RideId, driverId);
+            DispatchLogging.Committed(logger, result.Events);
         }
         return result;
     }

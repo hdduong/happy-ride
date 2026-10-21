@@ -14,7 +14,8 @@ public sealed class DispatchExpiryService(
     IRideRepository rides,
     IDispatchService dispatch,
     IUnitOfWork unitOfWork,
-    IRideWriteLock writeLock) : IDispatchExpiryService
+    IRideWriteLock writeLock,
+    ILogger<DispatchExpiryService> logger) : IDispatchExpiryService
 {
     public async Task<List<OutboundEvent>> AdvanceAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
@@ -26,13 +27,14 @@ public sealed class DispatchExpiryService(
                 continue;
 
             offer.Status = OfferStatus.Closed;
-            events.Add(new OutboundEvent.OfferClosed(offer.DriverId, offer.Id, "Expired"));
+            events.Add(new OutboundEvent.OfferClosed(offer.DriverId, offer.Id, offer.RideId, "Expired"));
         }
 
         foreach (var ride in await rides.ListSearchingAsync(cancellationToken))
             await dispatch.AdvanceAsync(ride, now, events, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        DispatchLogging.Committed(logger, events);
         return events;
     }
 }
