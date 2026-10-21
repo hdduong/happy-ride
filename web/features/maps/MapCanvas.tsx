@@ -15,11 +15,13 @@ export function MapCanvas({
   route = [],
   markers = [],
   pulse = null,
+  zoom = 15,
 }: {
   center: LatLng;
   route?: LatLng[];
   markers?: MapMarker[];
   pulse?: LatLng | null;
+  zoom?: number;
 }) {
   const [config, setConfig] = useState<MapClientConfig | null>(null);
 
@@ -50,6 +52,7 @@ export function MapCanvas({
           region={config.region || "VN"}
           language={config.language || "vi"}
           center={center}
+          zoom={zoom}
           route={route}
           markers={markers}
           pulse={pulse}
@@ -62,6 +65,7 @@ export function MapCanvas({
     <LibreDarkMap
       styleUrl={config?.styleUrl || darkStyle}
       center={center}
+      zoom={zoom}
       route={route}
       markers={markers}
       pulse={pulse}
@@ -72,12 +76,14 @@ export function MapCanvas({
 function LibreDarkMap({
   styleUrl,
   center,
+  zoom,
   route,
   markers,
   pulse,
 }: {
   styleUrl: string;
   center: LatLng;
+  zoom: number;
   route: LatLng[];
   markers: MapMarker[];
   pulse: LatLng | null;
@@ -95,7 +101,7 @@ function LibreDarkMap({
         container: host,
         style: styleUrl,
         center: [center.lng, center.lat],
-        zoom: 15,
+        zoom,
       });
       created = next;
       next.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
@@ -121,7 +127,7 @@ function LibreDarkMap({
       created?.remove();
       setMap(null);
     };
-  }, [host, styleUrl]);
+  }, [host, styleUrl, zoom]);
 
   useEffect(() => {
     if (!map?.getSource("route")) return;
@@ -133,14 +139,14 @@ function LibreDarkMap({
     void import("maplibre-gl").then((module) => {
       if (points.length < 2) {
         const only = points[0] ?? center;
-        map.jumpTo({ center: [only.lng, only.lat], zoom: 15 });
+        map.jumpTo({ center: [only.lng, only.lat], zoom });
         return;
       }
       const bounds = new module.LngLatBounds();
       for (const point of points) bounds.extend([point.lng, point.lat]);
       map.fitBounds(bounds, { padding: { top: 80, bottom: 280, left: 48, right: 48 }, maxZoom: 16, duration: 0 });
     });
-  }, [map, route, center, markers, pulse]);
+  }, [map, route, center, markers, pulse, zoom]);
 
   useEffect(() => {
     if (!map) return;

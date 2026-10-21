@@ -67,6 +67,32 @@ h1 {
   width: min(440px, 100%);
 }
 
+.picker {
+  width: min(880px, 100%);
+}
+
+.picker-map {
+  position: relative;
+  height: 280px;
+  margin: 20px 0 4px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--map);
+}
+
+.persona-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-top: 8px;
+}
+
+.persona-columns h2 {
+  font-size: 20px;
+  margin-top: 12px;
+}
+
 .lead {
   color: var(--muted);
   margin: 8px 0 8px;

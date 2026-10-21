@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using GrabBike.Api.Features.Dispatch;
+using GrabBike.Api.Features.Drivers;
 using GrabBike.Api.Features.Realtime;
+using GrabBike.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -265,13 +267,13 @@ public class RideFlowTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Hanoi_rider_quote_is_near_Hoan_Kiem()
+    public async Task Hanoi_rider_at_Lau_ech_Ha_My_offers_Doi_Can_before_Kim_Ma()
     {
         await using var fixture = new ApiFactory(Database);
         var quote = await Read(await fixture.Client(Nam).PostAsJsonAsync("/api/quotes", new
         {
-            pickup = new Pin(21.0287, 105.8524, "Hồ Hoàn Kiếm"),
-            dropoff = new Pin(21.0300, 105.8540, "Nearby"),
+            pickup = new Pin(21.03342, 105.82845, "Lẩu Ếch Hà My"),
+            dropoff = new Pin(21.03523, 105.82096, "Phố Đội Cấn"),
         }), HttpStatusCode.Created);
         var created = await Read(await fixture.Client(Nam).PostAsJsonAsync("/api/rides", new
         {
@@ -284,6 +286,39 @@ public class RideFlowTests(PostgresFixture postgres)
         Assert.NotEqual(Guid.Empty, await PendingOffer(fixture.Client("99999999-9999-9999-9999-999999999999"), rideId));
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), rideId));
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), rideId));
+    }
+
+    [Fact]
+    public async Task Startup_moves_HanoiD01_only_from_the_old_seed_and_never_during_a_trip()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var id = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var driver = await db.Drivers.FindAsync([id]);
+        Assert.NotNull(driver);
+        Assert.Equal(21.0352316, driver.Lat, 5);
+
+        driver.Lat = 21.02980;
+        driver.Lng = 105.85360;
+        driver.Status = DriverStatus.OnTrip;
+        await db.SaveChangesAsync();
+        await DatabaseSeeder.SeedAsync(db);
+        Assert.Equal(21.02980, driver.Lat, 5);
+        Assert.Equal(105.85360, driver.Lng, 5);
+
+        driver.Status = DriverStatus.Online;
+        await db.SaveChangesAsync();
+        await DatabaseSeeder.SeedAsync(db);
+        Assert.Equal(21.0352316, driver.Lat, 5);
+        Assert.Equal(105.8209560, driver.Lng, 5);
+
+        driver.Lat = 21.04000;
+        driver.Lng = 105.84000;
+        await db.SaveChangesAsync();
+        await DatabaseSeeder.SeedAsync(db);
+        Assert.Equal(21.04000, driver.Lat, 5);
+        Assert.Equal(105.84000, driver.Lng, 5);
     }
 
     [Fact]

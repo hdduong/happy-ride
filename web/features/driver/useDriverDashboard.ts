@@ -23,7 +23,8 @@ export function useDriverDashboard(userId: string) {
         if (cancel) return;
         const person = users.find((user) => user.id === userId) ?? null;
         setMe(person);
-        if (person) setCenter(centerForCity(person.city));
+        if (person?.lat != null && person.lng != null) setCenter({ lat: person.lat, lng: person.lng });
+        else if (person) setCenter(centerForCity(person.city));
       })
       .catch(() => undefined);
     return () => {

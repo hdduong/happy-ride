@@ -20,8 +20,22 @@ export function isHanoi(city: string | undefined): boolean {
   return Boolean(city && /hanoi|ha noi|hà nội/i.test(city));
 }
 
+export const HANOI_RIDER01_ID = "77777777-7777-7777-7777-777777777777";
+
+export const HANOI_RIDER01_PICKUP = {
+  name: "Lẩu Ếch Hà My",
+  address: "70 Ngõ 36 Giang Văn Minh, Phường Ba Đình, Hà Nội",
+  lat: 21.03342,
+  lng: 105.82845,
+};
+
 export function pickupForCity(city: string | undefined) {
   return isHanoi(city) ? HANOI_PICKUP : DEFAULT_PICKUP;
+}
+
+export function pickupForPersona(userId: string | undefined, city: string | undefined) {
+  if (userId === HANOI_RIDER01_ID) return HANOI_RIDER01_PICKUP;
+  return pickupForCity(city);
 }
 
 export function centerForCity(city: string | undefined): LatLng {

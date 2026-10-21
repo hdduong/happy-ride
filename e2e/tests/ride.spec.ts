@@ -1,6 +1,6 @@
 import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
 
-// Seeded personas: rider An Nguyễn, driver Khoa Phạm.
+// Seeded personas: rider HCMR01 Rider01, driver HCMD01 Driver01.
 const riderId = '11111111-1111-1111-1111-111111111111';
 const driverId = '33333333-3333-3333-3333-333333333333';
 const stepTimeout = 20000;

@@ -5,7 +5,7 @@ import { autocomplete, createQuote, getPlace } from "@/features/maps/api";
 import { cancelRide, confirmArrival, createRide, getRide } from "@/features/rides/api";
 import { getUsers } from "@/features/identity/api";
 import { rememberPersona, storedPersona } from "@/features/identity/storage";
-import { pickupForCity } from "@/features/maps/geo";
+import { pickupForPersona } from "@/features/maps/geo";
 import { useRideSession } from "@/features/rides/useRideSession";
 import { messageFrom } from "@/shared/api/client";
 import type { Place, Quote } from "@/features/maps/types";
@@ -24,7 +24,7 @@ export function useRiderBooking(userId: string) {
   const [busy, setBusy] = useState(false);
   const [quoting, setQuoting] = useState(false);
   const [homeReady, setHomeReady] = useState(false);
-  const [home, setHome] = useState(() => pickupForCity(undefined));
+  const [home, setHome] = useState(() => pickupForPersona(userId, undefined));
   const [cityError, setCityError] = useState<string | null>(null);
   const [cityAttempt, setCityAttempt] = useState(0);
   const searchSeq = useRef(0);
@@ -37,7 +37,7 @@ export function useRiderBooking(userId: string) {
     let cancel = false;
     const cached = storedPersona();
     if (cached?.id === userId) {
-      setHome(pickupForCity(cached.city));
+      setHome(pickupForPersona(userId, cached.city));
       setHomeReady(true);
     }
     getUsers(userId)
@@ -46,7 +46,7 @@ export function useRiderBooking(userId: string) {
         const person = users.find((user) => user.id === userId);
         if (!person) return;
         rememberPersona(person.id, person.city);
-        setHome(pickupForCity(person.city));
+        setHome(pickupForPersona(person.id, person.city));
         setCityError(null);
         setHomeReady(true);
       })
