@@ -48,6 +48,7 @@ web/
   shared/
     api/              HTTP transport and common request/error handling
     telemetry/        app session correlation and bounded activity delivery
+    server-observability/ Next.js Node telemetry setup and safe server events
     ui/               reusable presentation components
 ```
 
@@ -58,6 +59,8 @@ A poll represents the state when its request began. If a newer event or command 
 Feature API modules own their endpoint calls and response parsing. Shared HTTP code knows how to make a request, not how to book or accept a ride. Map components receive display inputs; they do not own ride lifecycle or dispatch decisions.
 
 Shared telemetry plumbing owns browser session identifiers and best-effort delivery to the API. Rider/driver actions and the shared ride session supply explicit activity and ride context; telemetry transport does not infer business actions from URLs. The API resolves display names and validates ride/offer associations before exporting client reports through its existing logger. Connection lifecycle records belong to `Realtime`. Browser reports and connection loss never mutate ride state, and telemetry delivery failures never become ride-command failures. See [observability](observability.md#rider-and-driver-activity) for fields, lifecycle boundaries, and queries.
+
+The root Next.js instrumentation hook initializes Node server observability once per process when its runtime connection string exists. The server module exports sanitized native Next.js spans and captured request errors through Azure Monitor using the `happy-ride-web` service name. It stays outside the browser dependency graph. Both servers share one Application Insights resource, but retain their own service names. Automatic browser injection and arbitrary console capture are disabled; browser business activity continues through the API. Telemetry initialization or delivery failure must not make a page unavailable.
 
 ## Review and verification
 

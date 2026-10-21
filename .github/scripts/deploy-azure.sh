@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create the shared App Service plan, API/web apps, and API monitoring, then apply settings.
+# Create the shared App Service plan, API/web apps, and shared monitoring, then apply settings.
 # Publishing the bits is done by azure/webapps-deploy after this script.
 set -euo pipefail
 
@@ -22,13 +22,14 @@ api_runtime="$(pick_runtime '^DOTNETCORE[:|]10' || true)"
 if [ -z "$api_runtime" ]; then
   api_runtime="$(pick_runtime '^DOTNETCORE[:|]8' || true)"
 fi
-web_runtime="$(pick_runtime '^NODE[:|]22' || true)"
+web_runtime="$(pick_runtime '^NODE[:|]22([.-]|[[:space:]]|$)' || true)"
 if [ -z "$web_runtime" ]; then
-  web_runtime="$(pick_runtime '^NODE[:|]20' || true)"
+  echo "Linux Node.js 22 is required by the web telemetry SDK but is unavailable in this subscription." >&2
+  exit 1
 fi
 
-if [ -z "$api_runtime" ] || [ -z "$web_runtime" ]; then
-  echo "Could not find a Linux .NET and Node runtime in this subscription."
+if [ -z "$api_runtime" ]; then
+  echo "Could not find a Linux .NET runtime in this subscription." >&2
   exit 1
 fi
 
@@ -85,6 +86,7 @@ az webapp update --resource-group "$RG" --name "$API_APP" --set httpsOnly=true >
 az webapp config set \
   --resource-group "$RG" \
   --name "$WEB_APP" \
+  --linux-fx-version "$web_runtime" \
   --always-on true \
   --startup-file "node server.js" --output none
 
