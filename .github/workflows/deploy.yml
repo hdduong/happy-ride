@@ -83,6 +83,7 @@ jobs:
           npm run build
           mkdir -p .next/standalone/.next
           cp -a .next/static .next/standalone/.next/static
+          if [ -d public ]; then cp -a public .next/standalone/public; fi
 
       - name: Log in to Azure
         uses: azure/login@v2

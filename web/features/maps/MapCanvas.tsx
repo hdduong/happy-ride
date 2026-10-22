@@ -9,6 +9,15 @@ import type { LatLng, MapClientConfig, MapMarker } from "./types";
 export type { MapMarker };
 
 const darkStyle = "https://tiles.openfreemap.org/styles/dark";
+let workerConfigured = false;
+
+function configureMapWorker(maplibregl: { setWorkerUrl?: (url: string) => void }) {
+  if (workerConfigured || typeof maplibregl.setWorkerUrl !== "function") return;
+  // MapLibre 6 loads vector tiles in this worker. Next does not emit a usable
+  // worker URL on its own, so the basemap stays a blank background.
+  maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+  workerConfigured = true;
+}
 
 export function MapCanvas({
   userId = null,
@@ -99,6 +108,7 @@ function LibreDarkMap({
     let cancelled = false;
     void import("maplibre-gl").then((maplibregl) => {
       if (cancelled) return;
+      configureMapWorker(maplibregl);
       const next = new maplibregl.Map({
         container: host,
         style: styleUrl,

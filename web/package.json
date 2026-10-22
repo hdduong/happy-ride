@@ -4,6 +4,8 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
+    "predev": "node scripts/copy-maplibre-worker.mjs",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
     "test:server-telemetry": "node tests/server-telemetry-smoke.mjs",
     "start": "next start --port 3000"
