@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
+import { basemapStyle } from "./basemapStyle";
 import { getMapConfig } from "./api";
 import { GoogleDarkMap } from "./GoogleDarkMap";
 import type { LatLng, MapClientConfig, MapMarker } from "./types";
@@ -111,7 +112,7 @@ function LibreDarkMap({
       configureMapWorker(maplibregl);
       const next = new maplibregl.Map({
         container: host,
-        style: styleUrl,
+        style: basemapStyle(styleUrl),
         center: [center.lng, center.lat],
         zoom,
       });
