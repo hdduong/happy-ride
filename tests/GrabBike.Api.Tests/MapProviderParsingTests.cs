@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GrabBike.Api.Features.Maps;
+using Microsoft.Extensions.Options;
 
 namespace GrabBike.Api.Tests;
 
@@ -40,6 +41,20 @@ public class MapProviderParsingTests
         Assert.NotNull(route);
         Assert.Equal(900, route.DistanceM);
         Assert.Equal(120, route.DurationS);
+    }
+
+    [Fact]
+    public void Google_config_is_a_light_map_with_only_the_browser_key()
+    {
+        var provider = new GoogleMapProvider(new HttpClient(), Options.Create(new MapOptions
+        {
+            Google = new GoogleKeyOptions { ApiKey = "server-key", BrowserKey = "browser-key" },
+        }));
+
+        Assert.Equal("Google", provider.Configuration.Provider);
+        Assert.Equal("light", provider.Configuration.Style);
+        Assert.Equal("browser-key", provider.Configuration.BrowserKey);
+        Assert.Null(provider.Configuration.StyleUrl);
     }
 
     [Fact]
