@@ -1,4 +1,5 @@
 using GrabBike.Api.Features.Rides;
+using GrabBike.Api.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace GrabBike.Api.Infrastructure.Persistence.Repositories;
@@ -45,4 +46,16 @@ public sealed class RideRepository(AppDbContext db) : IRideRepository
 
     public Task<List<Ride>> ListSearchingAsync(CancellationToken cancellationToken = default) =>
         db.Rides.Where(ride => ride.Status == RideStatus.Searching).ToListAsync(cancellationToken);
+
+    public async Task<GeoPoint?> ReadPickupAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var point = await db.Rides.AsNoTracking()
+            .Where(ride => ride.Id == id)
+            .Select(ride => new { ride.Pickup.Lat, ride.Pickup.Lng })
+            .FirstOrDefaultAsync(cancellationToken);
+        return point is null ? null : new GeoPoint { Lat = point.Lat, Lng = point.Lng };
+    }
+
+    public Task<bool> IsAcceptedAsync(Guid id, CancellationToken cancellationToken = default) =>
+        db.Rides.AsNoTracking().AnyAsync(ride => ride.Id == id && ride.Status == RideStatus.Accepted, cancellationToken);
 }

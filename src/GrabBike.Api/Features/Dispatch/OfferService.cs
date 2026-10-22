@@ -99,14 +99,14 @@ public sealed class OfferService(
 
     private async Task<GeoRoute?> PreviewPickupRouteAsync(Guid driverId, Guid offerId, CancellationToken cancellationToken)
     {
-        var driver = await drivers.FindAsync(driverId, cancellationToken);
-        var offer = await offers.FindAsync(offerId, cancellationToken);
-        if (driver is null || offer is null)
+        var position = await drivers.ReadPositionAsync(driverId, cancellationToken);
+        var rideId = await offers.ReadRideIdAsync(offerId, cancellationToken);
+        if (position is null || rideId is null)
             return null;
-        var ride = await rides.FindAsync(offer.RideId, cancellationToken);
-        if (ride is null)
+        var pickup = await rides.ReadPickupAsync(rideId.Value, cancellationToken);
+        if (pickup is null)
             return null;
-        return await pickupRouter.ToPickupAsync(driver.Lat, driver.Lng, ride.Pickup, cancellationToken);
+        return await pickupRouter.ToPickupAsync(position.Value.Lat, position.Value.Lng, pickup, cancellationToken);
     }
 
     public async Task<OfferOutcome> DeclineAsync(Guid driverId, Guid offerId, DateTimeOffset now, CancellationToken cancellationToken = default)

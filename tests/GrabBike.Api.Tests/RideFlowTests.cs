@@ -5,6 +5,7 @@ using GrabBike.Api.Features.Dispatch;
 using GrabBike.Api.Features.Drivers;
 using GrabBike.Api.Features.Realtime;
 using GrabBike.Api.Infrastructure.Persistence;
+using GrabBike.Api.SharedKernel;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -138,6 +139,46 @@ public class RideFlowTests(PostgresFixture postgres)
         Assert.Equal("Accepted", view.GetProperty("status").GetString());
         var driverId = view.GetProperty("driver").GetProperty("userId").GetGuid();
         Assert.Equal(Guid.Parse(Khoa), driverId);
+    }
+
+    [Fact]
+    public async Task Delayed_routing_cannot_accept_one_offer_twice()
+    {
+        var gate = new GatedPickupRouter(2);
+        await using var fixture = new ApiFactory(Database, pickupRouter: gate);
+        var rideId = await CreateRide(fixture.Client(An));
+        var offerId = await PendingOffer(fixture.Client(Khoa), rideId);
+
+        var first = fixture.Client(Khoa).PostAsync($"/api/offers/{offerId}/accept", content: null);
+        var second = fixture.Client(Khoa).PostAsync($"/api/offers/{offerId}/accept", content: null);
+        await gate.AllEntered.WaitAsync(TimeSpan.FromSeconds(20));
+        gate.Release();
+        var responses = await Task.WhenAll(first, second);
+
+        Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.OK));
+        Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.Conflict));
+        var ride = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("Accepted", ride.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Delayed_accept_does_not_revive_a_cancelled_ride()
+    {
+        var gate = new GatedPickupRouter(1);
+        await using var fixture = new ApiFactory(Database, pickupRouter: gate);
+        var rideId = await CreateRide(fixture.Client(An));
+        var offerId = await PendingOffer(fixture.Client(Khoa), rideId);
+
+        var accept = fixture.Client(Khoa).PostAsync($"/api/offers/{offerId}/accept", content: null);
+        await gate.AllEntered.WaitAsync(TimeSpan.FromSeconds(20));
+        var cancelled = await Read(await fixture.Client(An).PostAsync($"/api/rides/{rideId}/cancel", content: null), HttpStatusCode.OK);
+        Assert.Equal("Cancelled", cancelled.GetProperty("status").GetString());
+        gate.Release();
+
+        var acceptResponse = await accept;
+        Assert.NotEqual(HttpStatusCode.OK, acceptResponse.StatusCode);
+        var ride = await Read(await fixture.Client(An).GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("Cancelled", ride.GetProperty("status").GetString());
     }
 
     [Fact]
@@ -452,6 +493,25 @@ public class RideFlowTests(PostgresFixture postgres)
 
     private sealed record Pin(double Lat, double Lng, string Address);
 
+    private sealed class GatedPickupRouter(int expected) : IPickupRouter
+    {
+        private int _entered;
+        private readonly TaskCompletionSource _allEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task AllEntered => _allEntered.Task;
+
+        public void Release() => _release.TrySetResult();
+
+        public async Task<GeoRoute> ToPickupAsync(double lat, double lng, GeoPoint pickup, CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _entered) >= expected)
+                _allEntered.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+            return PickupRoutes.Straight(lat, lng, pickup.Lat, pickup.Lng);
+        }
+    }
+
     private sealed class FailingPublisher : IRideEventPublisher
     {
         private int _attempts;
@@ -470,13 +530,15 @@ public class RideFlowTests(PostgresFixture postgres)
         private readonly string _databaseName;
         private readonly string _connectionString;
         private readonly IRideEventPublisher? _publisher;
+        private readonly IPickupRouter? _pickupRouter;
         private readonly string? _environment;
 
-        public ApiFactory(string adminConnection, IRideEventPublisher? publisher = null, string? environment = null)
+        public ApiFactory(string adminConnection, IRideEventPublisher? publisher = null, string? environment = null, IPickupRouter? pickupRouter = null)
         {
             _adminConnection = adminConnection;
             _publisher = publisher;
             _environment = environment;
+            _pickupRouter = pickupRouter;
             _databaseName = "hr" + Guid.NewGuid().ToString("N");
             _connectionString = new Npgsql.NpgsqlConnectionStringBuilder(adminConnection) { Database = _databaseName }.ConnectionString;
             using var connection = new Npgsql.NpgsqlConnection(adminConnection);
@@ -499,12 +561,20 @@ public class RideFlowTests(PostgresFixture postgres)
             builder.UseSetting("APPLICATIONINSIGHTS_CONNECTION_STRING", "");
             builder.UseSetting("ConnectionStrings:GrabBike", _connectionString);
             builder.UseSetting("Dispatch:Bus", "InMemory");
-            if (_publisher is not null)
+            if (_publisher is not null || _pickupRouter is not null)
             {
                 builder.ConfigureServices(services =>
                 {
-                    services.RemoveAll<IRideEventPublisher>();
-                    services.AddSingleton(_publisher);
+                    if (_publisher is not null)
+                    {
+                        services.RemoveAll<IRideEventPublisher>();
+                        services.AddSingleton(_publisher);
+                    }
+                    if (_pickupRouter is not null)
+                    {
+                        services.RemoveAll<IPickupRouter>();
+                        services.AddSingleton(_pickupRouter);
+                    }
                 });
             }
         }

@@ -65,14 +65,15 @@ public sealed class DriverSimulationService(
 
     private async Task EnsurePickupRoutesAsync(CancellationToken cancellationToken)
     {
-        foreach (var driver in await drivers.ListOnTripAsync(cancellationToken))
+        foreach (var trip in await drivers.ReadOnTripAsync(cancellationToken))
         {
-            if (driver.CurrentRideId is not Guid rideId || pickupRoutes.Geometry(rideId) is not null)
+            if (pickupRoutes.Geometry(trip.RideId) is not null)
                 continue;
-            var ride = await rides.FindAsync(rideId, cancellationToken);
-            if (ride is null || ride.Status != RideStatus.Accepted)
+            var position = await drivers.ReadPositionAsync(trip.UserId, cancellationToken);
+            var pickup = await rides.ReadPickupAsync(trip.RideId, cancellationToken);
+            if (position is null || pickup is null || !await rides.IsAcceptedAsync(trip.RideId, cancellationToken))
                 continue;
-            pickupRoutes.Start(rideId, await pickupRouter.ToPickupAsync(driver.Lat, driver.Lng, ride.Pickup, cancellationToken));
+            pickupRoutes.Start(trip.RideId, await pickupRouter.ToPickupAsync(position.Value.Lat, position.Value.Lng, pickup, cancellationToken));
         }
     }
 

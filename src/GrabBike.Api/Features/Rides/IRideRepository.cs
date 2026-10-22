@@ -1,3 +1,5 @@
+using GrabBike.Api.SharedKernel;
+
 namespace GrabBike.Api.Features.Rides;
 
 public interface IRideRepository
@@ -7,4 +9,6 @@ public interface IRideRepository
     Task<Ride?> FindActiveForRiderAsync(Guid riderId, CancellationToken cancellationToken = default);
     Task<Ride?> FindCurrentForRiderAsync(Guid riderId, CancellationToken cancellationToken = default);
     Task<List<Ride>> ListSearchingAsync(CancellationToken cancellationToken = default);
+    Task<GeoPoint?> ReadPickupAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<bool> IsAcceptedAsync(Guid id, CancellationToken cancellationToken = default);
 }

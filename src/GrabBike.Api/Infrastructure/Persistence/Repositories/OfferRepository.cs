@@ -21,4 +21,10 @@ public sealed class OfferRepository(AppDbContext db) : IOfferRepository
 
     public Task<List<Offer>> ForRideAsync(Guid rideId, CancellationToken cancellationToken = default) =>
         db.Offers.Where(offer => offer.RideId == rideId).ToListAsync(cancellationToken);
+
+    public Task<Guid?> ReadRideIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        db.Offers.AsNoTracking()
+            .Where(offer => offer.Id == id)
+            .Select(offer => (Guid?)offer.RideId)
+            .FirstOrDefaultAsync(cancellationToken);
 }
