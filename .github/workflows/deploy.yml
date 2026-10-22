@@ -260,12 +260,19 @@ jobs:
             fi
           fi
 
+      - name: Stop the web app
+        run: |
+          az webapp stop \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name "${AZURE_WEB_APP:-app-grabbike-web}"
+
       - name: Deploy the web app
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEB_APP_NAME || 'app-grabbike-web' }}
           package: web/.next/standalone
           clean: true
+          restart: false
 
       - name: Apply the web Entra settings
         env:
@@ -307,6 +314,12 @@ jobs:
                 AZURE_API_CLIENT_ID="$AZURE_API_CLIENT_ID" \
                 AZURE_API_SCOPE="$new_scope"
           fi
+
+      - name: Start the web app
+        run: |
+          az webapp start \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name "${AZURE_WEB_APP:-app-grabbike-web}"
 
       - name: Keep only the new Entra identity
         env:

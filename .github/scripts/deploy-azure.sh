@@ -88,7 +88,7 @@ az webapp config set \
   --name "$WEB_APP" \
   --linux-fx-version "$web_runtime" \
   --always-on true \
-  --startup-file "node server.js" --output none
+  --startup-file "rm -rf .next/server/route-cache .next/cache && node server.js" --output none
 
 az webapp config appsettings set \
   --resource-group "$RG" \
