@@ -265,6 +265,7 @@ jobs:
         with:
           app-name: ${{ vars.AZURE_WEB_APP_NAME || 'app-grabbike-web' }}
           package: web/.next/standalone
+          clean: true
 
       - name: Apply the web Entra settings
         env:
