@@ -14,8 +14,8 @@ public static class MapStyles
 {
     public const string Dark = "https://tiles.openfreemap.org/styles/dark";
 
-    public static string VietMapDark(string tileKey) =>
-        $"https://maps.vietmap.vn/maps/styles/dm/style.json?apikey={Uri.EscapeDataString(tileKey)}";
+    public static string VietMap(string tileKey) =>
+        $"https://maps.vietmap.vn/maps/styles/tm/style.json?apikey={Uri.EscapeDataString(tileKey)}";
 }
 public sealed record MapRoute(int DistanceM, int DurationS, GeoRoute Geometry);
 
