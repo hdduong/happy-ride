@@ -307,6 +307,12 @@ jobs:
                 AZURE_API_SCOPE="$new_scope"
           fi
 
+      - name: Restart the web app
+        run: |
+          az webapp restart \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name "${AZURE_WEB_APP:-app-grabbike-web}"
+
       - name: Keep only the new Entra identity
         env:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
