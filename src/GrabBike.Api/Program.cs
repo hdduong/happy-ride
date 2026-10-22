@@ -152,6 +152,8 @@ else
     builder.Services.AddSingleton<IDispatchBus, InMemoryDispatchBus>();
     builder.Services.AddHostedService<DispatchExpiryWorker>();
 }
+builder.Services.AddSingleton<IPickupRoutes, PickupRoutes>();
+builder.Services.AddScoped<IPickupRouter, PickupRouter>();
 builder.Services.AddSingleton<IRideWriteLock, RideWriteLock>();
 builder.Services.AddSingleton<IUserIdProvider, QueryUserIdProvider>();
 builder.Services.AddSingleton<IRideEventPublisher, SignalRRideEventPublisher>();

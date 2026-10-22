@@ -13,10 +13,13 @@ public sealed class DriverSimulationService(
     IDriverRepository drivers,
     IRideRepository rides,
     IUnitOfWork unitOfWork,
-    IRideWriteLock writeLock) : IDriverSimulationService
+    IRideWriteLock writeLock,
+    IPickupRoutes pickupRoutes,
+    IPickupRouter pickupRouter) : IDriverSimulationService
 {
     public async Task<List<OutboundEvent>> AdvanceAsync(DateTimeOffset now, double stepMeters, CancellationToken cancellationToken = default)
     {
+        await EnsurePickupRoutesAsync(cancellationToken);
         await using var _ = await writeLock.AcquireAsync(cancellationToken);
         var events = new List<OutboundEvent>();
         foreach (var driver in await drivers.ListOnTripAsync(cancellationToken))
@@ -30,12 +33,22 @@ public sealed class DriverSimulationService(
 
             if (ride.Status == RideStatus.Accepted)
             {
-                var moved = Geo.MoveToward(driver.Lat, driver.Lng, ride.Pickup.Lat, ride.Pickup.Lng, stepMeters);
+                if (!pickupRoutes.TryAdvance(ride.Id, stepMeters, out var moved))
+                {
+                    var straight = Geo.MoveToward(driver.Lat, driver.Lng, ride.Pickup.Lat, ride.Pickup.Lng, stepMeters);
+                    moved = new PickupStep(straight.Lat, straight.Lng, straight.Heading, straight.MovedM);
+                }
                 ApplyMovement(driver, moved.Lat, moved.Lng, moved.Heading, moved.MovedM);
                 if (moved.MovedM >= 0.5)
                     events.Add(LocationEvent(ride, driver, now));
             }
-            else if (ride.Status == RideStatus.InProgress)
+            else
+            {
+                if (driver.CurrentRideId is Guid finishedRideId)
+                    pickupRoutes.Forget(finishedRideId);
+            }
+
+            if (ride.Status == RideStatus.InProgress)
             {
                 var moved = Geo.AdvanceRoute(ride.Route.Coordinates, ride.SegmentIndex, ride.SegmentOffsetM, stepMeters);
                 ride.SegmentIndex = moved.Segment;
@@ -48,6 +61,19 @@ public sealed class DriverSimulationService(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return events;
+    }
+
+    private async Task EnsurePickupRoutesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var driver in await drivers.ListOnTripAsync(cancellationToken))
+        {
+            if (driver.CurrentRideId is not Guid rideId || pickupRoutes.Geometry(rideId) is not null)
+                continue;
+            var ride = await rides.FindAsync(rideId, cancellationToken);
+            if (ride is null || ride.Status != RideStatus.Accepted)
+                continue;
+            pickupRoutes.Start(rideId, await pickupRouter.ToPickupAsync(driver.Lat, driver.Lng, ride.Pickup, cancellationToken));
+        }
     }
 
     private static void ApplyMovement(Driver driver, double lat, double lng, double heading, double movedM)

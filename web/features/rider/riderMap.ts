@@ -1,4 +1,4 @@
-import { bearing, isPlotted, linePoints } from "@/features/maps/geo";
+import { bearing, isPlotted, riderPosition, routeForStatus } from "@/features/maps/geo";
 import type { MapMarker } from "@/features/maps/MapCanvas";
 import type { RiderBooking } from "./useRiderBooking";
 
@@ -13,9 +13,12 @@ export function riderMap({ ride, live, pickup: selected, destination, quote }: P
     (destination
       ? { lat: destination.lat, lng: destination.lng, address: destination.name || destination.address }
       : null);
-  const quotedLine = ride ? linePoints(ride.route) : quote ? linePoints(quote.route) : [];
-  const route =
-    quotedLine.length >= 2 ? quotedLine : dropoff && (ride || quote) && isPlotted(dropoff) ? [pickup, dropoff] : [];
+  const route = routeForStatus(
+    ride?.status,
+    ride?.approachRoute,
+    ride ? ride.route : quote?.route,
+    dropoff && (ride || quote) && isPlotted(dropoff) ? [pickup, dropoff] : [],
+  );
   const driverLive = live && ride && live.rideId === ride.rideId ? live : null;
   const driverPoint = driverLive
     ? { lat: driverLive.lat, lng: driverLive.lng }
@@ -35,8 +38,10 @@ export function riderMap({ ride, live, pickup: selected, destination, quote }: P
       ride.status !== "NoDriver" &&
       ride.status !== "Cancelled",
   );
+  const together = ride?.status === "InProgress" || ride?.status === "DroppedOff";
+  const riderPoint = riderPosition(ride?.status, pickup, driverPoint);
   const markers: MapMarker[] = [];
-  if (isPlotted(pickup)) markers.push({ ...pickup, kind: "pickup" });
+  if (isPlotted(riderPoint)) markers.push({ ...riderPoint, kind: "pickup", offset: together ? [-16, 8] : undefined });
   if (dropoff && isPlotted(dropoff) && (ride || quote)) markers.push({ ...dropoff, kind: "dropoff" });
   if (showBike && driverPoint && isPlotted(driverPoint)) {
     markers.push({ ...driverPoint, kind: "bike", heading });

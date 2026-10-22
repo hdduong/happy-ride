@@ -375,6 +375,7 @@ public sealed class BusinessLoggingTests(PostgresFixture postgres)
             var drivers = new DriverRepository(fixture._db);
             var dispatch = new DispatchService(offers, drivers);
             var writeLock = new RideWriteLock();
+            var pickupRoutes = new PickupRoutes();
             fixture.UnitOfWork = new SavingUnitOfWork(fixture._db);
             var bus = new InlineDispatchBus(async (message, cancellationToken) =>
             {
@@ -389,9 +390,9 @@ public sealed class BusinessLoggingTests(PostgresFixture postgres)
                 return events;
             });
             fixture.Rides = new RideService(new QuoteRepository(fixture._db), rides, offers, drivers, bus,
-                fixture.UnitOfWork, writeLock, fixture.Logs.Logger<RideService>());
+                fixture.UnitOfWork, writeLock, pickupRoutes, fixture.Logs.Logger<RideService>());
             fixture.Offers = new OfferService(offers, rides, drivers, dispatch, bus, fixture.UnitOfWork, writeLock,
-                fixture.Logs.Logger<OfferService>());
+                new StraightPickupRouter(), pickupRoutes, fixture.Logs.Logger<OfferService>());
             fixture.Expiry = new DispatchExpiryService(offers, rides, dispatch, fixture.UnitOfWork, writeLock,
                 fixture.Logs.Logger<DispatchExpiryService>());
             return fixture;
@@ -494,6 +495,12 @@ public sealed class BusinessLoggingTests(PostgresFixture postgres)
                 owner.Entries.Add(entry);
             }
         }
+    }
+
+    private sealed class StraightPickupRouter : IPickupRouter
+    {
+        public Task<GeoRoute> ToPickupAsync(double lat, double lng, GeoPoint pickup, CancellationToken cancellationToken = default) =>
+            Task.FromResult(PickupRoutes.Straight(lat, lng, pickup.Lat, pickup.Lng));
     }
 
     private sealed class FailingPublisher(Exception exception) : IRideEventPublisher

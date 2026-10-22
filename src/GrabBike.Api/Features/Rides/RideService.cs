@@ -26,6 +26,7 @@ public sealed class RideService(
     IDispatchBus dispatchBus,
     IUnitOfWork unitOfWork,
     IRideWriteLock writeLock,
+    IPickupRoutes pickupRoutes,
     ILogger<RideService> logger) : IRideService
 {
     public async Task<RideOutcome> CreateAsync(Guid riderId, Guid quoteId, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -137,6 +138,7 @@ public sealed class RideService(
 
         var previousStatus = ride.Status;
         ride.Status = RideStatus.Cancelled;
+        pickupRoutes.Forget(ride.Id);
         await ReleaseDriverAsync(ride, cancellationToken);
         var result = await StatusResultAsync(ride, cancellationToken);
         foreach (var offer in await offers.ForRideAsync(ride.Id, cancellationToken))
@@ -180,6 +182,8 @@ public sealed class RideService(
             return new RideOutcome.TransitionConflict(ride.Status.ToString(), target.ToString());
 
         ride.Status = target;
+        if (target != RideStatus.Accepted)
+            pickupRoutes.Forget(ride.Id);
         if (target == RideStatus.DriverArrived && ride.DriverId is Guid arrivedDriverId)
         {
             var arrivedDriver = await drivers.FindAsync(arrivedDriverId, cancellationToken);
@@ -245,7 +249,7 @@ public sealed class RideService(
         Driver? driver = null;
         if (ride.DriverId is Guid driverId)
             driver = await drivers.FindAsync(driverId, cancellationToken);
-        return RideMaps.ToView(ride, driver);
+        return RideMaps.ToView(ride, driver, pickupRoutes.Geometry(ride.Id));
     }
 
     private static bool IsActive(RideStatus status) => status is

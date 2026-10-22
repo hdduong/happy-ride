@@ -16,7 +16,8 @@ public sealed record RideView(
     int FareVnd,
     GeoRoute Route,
     int Round,
-    DriverSnapshot? Driver);
+    DriverSnapshot? Driver,
+    GeoRoute? ApproachRoute = null);
 
 public sealed class CreateRideRequest
 {
