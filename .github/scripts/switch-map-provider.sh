@@ -46,7 +46,17 @@ PY
 previous="$(cat "${settings_file}.previous")"
 rm -f "${settings_file}.previous"
 
-restore_previous() {
+changed=0
+live=""
+restored=0
+poll_attempts="${MAP_SWITCH_ATTEMPTS:-20}"
+poll_sleep="${MAP_SWITCH_POLL_SECONDS:-15}"
+
+restore_if_needed() {
+  if [ "$restored" = "1" ] || [ "$changed" != "1" ] || [ "$live" = "$provider" ]; then
+    return 0
+  fi
+  restored=1
   echo "Restoring Maps__Provider to ${previous}." >&2
   az webapp config appsettings set \
     --resource-group "$rg" \
@@ -55,17 +65,26 @@ restore_previous() {
     --output none
 }
 
+on_exit() {
+  local status=$?
+  restore_if_needed || true
+  rm -f "$settings_file" "${settings_file}.previous"
+  exit "$status"
+}
+trap on_exit EXIT
+trap 'exit 143' TERM INT
+
 az webapp config appsettings set \
   --resource-group "$rg" \
   --name "$app" \
   --settings "Maps__Provider=$provider" \
   --output none
+changed=1
 echo "Maps__Provider is now $provider"
 
 echo "Waiting for the API to report ${provider}."
-live=""
-for _ in $(seq 1 20); do
-  if live="$(curl -fsS "${web%/}/backend/api/map-config" | python3 -c 'import json,sys
+for _ in $(seq 1 "$poll_attempts"); do
+  if live="$(curl --connect-timeout 5 --max-time 10 -fsS "${web%/}/backend/api/map-config" | python3 -c 'import json,sys
 try:
     print(json.load(sys.stdin).get("provider") or "")
 except Exception:
@@ -78,10 +97,9 @@ except Exception:
     live=""
     echo "Map config is not ready yet."
   fi
-  sleep 15
+  sleep "$poll_sleep"
 done
 if [ "$live" != "$provider" ]; then
-  restore_previous
   echo "The API did not report ${provider}." >&2
   exit 1
 fi
