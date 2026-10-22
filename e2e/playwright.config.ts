@@ -34,7 +34,9 @@ export default defineConfig({
         ConnectionStrings__GrabBike: process.env.ConnectionStrings__GrabBike
           ?? 'Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride',
         'Dispatch__Bus': 'InMemory',
-        'Maps__Provider': 'Fake',
+        'Maps__Provider': process.env.E2E_MAPS_PROVIDER ?? 'Fake',
+        'Maps__VietMap__ApiKey': process.env.E2E_VIETMAP_API_KEY ?? '',
+        'Maps__VietMap__TileKey': process.env.E2E_VIETMAP_TILE_KEY ?? '',
       },
       name: 'api',
       reuseExistingServer: reuseDevServers,

@@ -13,7 +13,7 @@ type LngLatBounds = { extend(lngLat: [number, number]): void };
 type GeoJsonSource = { setData(data: unknown): void };
 type VietMap = {
   addControl(control: unknown, position?: string): void;
-  on(event: "load", handler: () => void): void;
+  on(event: "load" | "error", handler: () => void): void;
   addSource(id: string, source: unknown): void;
   addLayer(layer: unknown): void;
   getSource(id: string): GeoJsonSource | undefined;
@@ -98,7 +98,9 @@ export function MapCanvas({
     };
   }, [userId]);
 
-  if (config?.provider === "Google" && config.browserKey) {
+  if (!config) return <div className="map-canvas" />;
+
+  if (config.provider === "Google" && config.browserKey) {
     return (
       <div className="map-canvas">
         <GoogleDarkMap
@@ -158,6 +160,8 @@ function LibreDarkMap({
         zoom,
       });
       created = next;
+      // This fork throws error events that nobody listened for, which takes down the page.
+      next.on("error", () => {});
       next.addControl(new vietmapgl.NavigationControl({ showCompass: false }), "top-right");
       next.on("load", () => {
         if (cancelled) return;
@@ -185,20 +189,27 @@ function LibreDarkMap({
   }, [host, styleUrl, zoom]);
 
   useEffect(() => {
-    if (!map?.getSource("route")) return;
-    map.getSource("route")?.setData(lineData(route));
+    if (!map) return;
+    const current = map;
+    const source = routeSource(current);
+    if (!source) return;
+    source.setData(lineData(route));
     const points = [...route, ...markers];
     if (pulse) points.push(pulse);
     if (points.length === 0) points.push(center);
     void loadVietMap().then((vietmapgl) => {
-      if (points.length < 2) {
-        const only = points[0] ?? center;
-        map.jumpTo({ center: [only.lng, only.lat], zoom });
-        return;
+      try {
+        if (points.length < 2) {
+          const only = points[0] ?? center;
+          current.jumpTo({ center: [only.lng, only.lat], zoom });
+          return;
+        }
+        const bounds = new vietmapgl.LngLatBounds();
+        for (const point of points) bounds.extend([point.lng, point.lat]);
+        current.fitBounds(bounds, { padding: { top: 80, bottom: 280, left: 48, right: 48 }, maxZoom: 16, duration: 0 });
+      } catch {
+        // The map was removed while its style was changing.
       }
-      const bounds = new vietmapgl.LngLatBounds();
-      for (const point of points) bounds.extend([point.lng, point.lat]);
-      map.fitBounds(bounds, { padding: { top: 80, bottom: 280, left: 48, right: 48 }, maxZoom: 16, duration: 0 });
     });
   }, [map, route, center, markers, pulse, zoom]);
 
@@ -208,21 +219,25 @@ function LibreDarkMap({
     let cancelled = false;
     void loadVietMap().then((vietmapgl) => {
       if (cancelled) return;
-      current = markers.map((marker) => {
-        const element = document.createElement("div");
-        const glyph = document.createElement("div");
-        glyph.className = marker.kind === "bike" ? "map-bike" : marker.kind === "dropoff" ? "map-dropoff" : "map-pickup";
-        if (marker.kind === "bike" && marker.heading != null) glyph.style.transform = `rotate(${marker.heading}deg)`;
-        element.appendChild(glyph);
-        return new vietmapgl.Marker({ element }).setLngLat([marker.lng, marker.lat]).addTo(map);
-      });
-      if (pulse) {
-        const element = document.createElement("div");
-        element.className = "map-pulse-anchor";
-        const ring = document.createElement("div");
-        ring.className = "map-pulse";
-        element.appendChild(ring);
-        current.push(new vietmapgl.Marker({ element }).setLngLat([pulse.lng, pulse.lat]).addTo(map));
+      try {
+        current = markers.map((marker) => {
+          const element = document.createElement("div");
+          const glyph = document.createElement("div");
+          glyph.className = marker.kind === "bike" ? "map-bike" : marker.kind === "dropoff" ? "map-dropoff" : "map-pickup";
+          if (marker.kind === "bike" && marker.heading != null) glyph.style.transform = `rotate(${marker.heading}deg)`;
+          element.appendChild(glyph);
+          return new vietmapgl.Marker({ element }).setLngLat([marker.lng, marker.lat]).addTo(map);
+        });
+        if (pulse) {
+          const element = document.createElement("div");
+          element.className = "map-pulse-anchor";
+          const ring = document.createElement("div");
+          ring.className = "map-pulse";
+          element.appendChild(ring);
+          current.push(new vietmapgl.Marker({ element }).setLngLat([pulse.lng, pulse.lat]).addTo(map));
+        }
+      } catch {
+        // The map was removed while its style was changing.
       }
     });
     return () => {
@@ -232,6 +247,15 @@ function LibreDarkMap({
   }, [map, markers, pulse]);
 
   return <div className="map-canvas" ref={setHost} />;
+}
+
+function routeSource(map: VietMap | null) {
+  if (!map) return undefined;
+  try {
+    return map.getSource("route");
+  } catch {
+    return undefined;
+  }
 }
 
 function lineData(route: LatLng[]) {
