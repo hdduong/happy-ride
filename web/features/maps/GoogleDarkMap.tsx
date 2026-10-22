@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { APIProvider, Map, useMap, ColorScheme } from "@vis.gl/react-google-maps";
-import { bikeMarkerSvg, personMarkerSvg } from "./markerIcons";
+import { bikeMarkerSvgFor, personMarkerSvg } from "./markerIcons";
 import type { LatLng, MapMarker } from "./types";
 
 export function GoogleDarkMap({
@@ -66,7 +66,7 @@ function GoogleOverlays({
       icon: marker.kind === "dropoff"
         ? { path: maps.SymbolPath.CIRCLE, scale: 7, fillColor: "#111", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 }
         : {
-            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(marker.kind === "bike" ? bikeMarkerSvg : personMarkerSvg)}`,
+            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(marker.kind === "bike" ? bikeMarkerSvgFor(marker.heading ?? 0) : personMarkerSvg)}`,
             scaledSize: new maps.Size(36, 36),
             anchor: new maps.Point(18, 18),
           },

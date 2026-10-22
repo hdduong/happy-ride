@@ -14,3 +14,8 @@ export const bikeMarkerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
     <path d="M19.2 13.1 20.6 11.2h2.4"/>
   </g>
 </svg>`;
+
+export function bikeMarkerSvgFor(heading: number) {
+  const turn = Number.isFinite(heading) ? heading : 0;
+  return bikeMarkerSvg.replace("<g ", `<g transform="rotate(${turn} 16 16)" `);
+}

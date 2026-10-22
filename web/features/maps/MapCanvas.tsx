@@ -254,8 +254,11 @@ function LibreDarkMap({
           const element = document.createElement("div");
           element.className = marker.kind === "bike" ? "map-bike" : marker.kind === "dropoff" ? "map-dropoff" : "map-rider";
           if (marker.kind === "bike") {
-            element.innerHTML = bikeMarkerSvg;
-            element.style.transform = `rotate(${marker.heading ?? 0}deg)`;
+            const glyph = document.createElement("div");
+            glyph.className = "map-bike-heading";
+            glyph.innerHTML = bikeMarkerSvg;
+            glyph.style.transform = `rotate(${marker.heading ?? 0}deg)`;
+            element.appendChild(glyph);
           } else if (marker.kind !== "dropoff") {
             element.innerHTML = personMarkerSvg;
           }
