@@ -9,7 +9,7 @@ public sealed class GoogleMapProvider(HttpClient http, IOptions<MapOptions> opti
 {
     public MapConfiguration Configuration => new(
         "Google",
-        "dark",
+        "light",
         StyleUrl: null,
         BrowserKey: string.IsNullOrWhiteSpace(options.Value.Google.BrowserKey) ? null : options.Value.Google.BrowserKey);
 
