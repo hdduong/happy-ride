@@ -1,6 +1,7 @@
 import { DefaultHttpClient, HttpTransportType, HubConnectionBuilder, LogLevel, NullLogger, type HttpRequest, type HttpResponse } from "@microsoft/signalr";
 import { apiBase } from "@/shared/api/client";
 import { currentPersonaProof, ensurePersonaSession } from "@/shared/api/personaSession";
+import { bindMapConfigRefresh } from "@/features/maps/refresh";
 import { asLocation, asOffer, asOfferClosed, asRide } from "./parse";
 import { openConnection } from "./connectionLifecycle";
 import { observeConnectionActivity } from "./connectionActivity";
@@ -59,10 +60,7 @@ export function openRideConnection(userId: string, handlers: RideHandlers, activ
     register("DriverLocation", asLocation, handlers.onLocation);
     register("OfferReceived", asOffer, handlers.onOffer);
     register("OfferClosed", asOfferClosed, handlers.onOfferClosed);
-    connection.on("MapConfigChanged", () => {
-      if (!isActive()) return;
-      window.dispatchEvent(new Event("happy-ride-map-config"));
-    });
+    bindMapConfigRefresh(connection, isActive);
     return { connection };
   }, () => lifecycle.failed(), () => lifecycle.connected());
 }
