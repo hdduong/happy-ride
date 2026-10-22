@@ -1,6 +1,8 @@
-import type { StyleSpecification } from "maplibre-gl";
-
-export function basemapStyle(styleUrl: string): string | StyleSpecification {
+export function basemapStyle(styleUrl: string): string | {
+  version: 8;
+  sources: { vietmap: { type: "raster"; tiles: string[]; tileSize: number; attribution: string } };
+  layers: { id: string; type: "raster"; source: "vietmap" }[];
+} {
   let parsed: URL;
   try {
     parsed = new URL(styleUrl);

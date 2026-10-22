@@ -1,4 +1,4 @@
-@import "maplibre-gl/dist/maplibre-gl.css";
+@import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
 
 :root {
   color-scheme: dark;
@@ -162,7 +162,7 @@ h1 {
 }
 
 .map-canvas svg,
-.map-canvas .maplibregl-map,
+.map-canvas .vietmapgl-map,
 .map-canvas > div {
   display: block;
   width: 100%;

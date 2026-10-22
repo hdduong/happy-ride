@@ -34,7 +34,9 @@ export default defineConfig({
         ConnectionStrings__GrabBike: process.env.ConnectionStrings__GrabBike
           ?? 'Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride',
         'Dispatch__Bus': 'InMemory',
-        'Maps__Provider': 'Fake',
+        'Maps__Provider': process.env.E2E_MAPS_PROVIDER ?? 'Fake',
+        'Maps__VietMap__ApiKey': process.env.E2E_VIETMAP_API_KEY ?? '',
+        'Maps__VietMap__TileKey': process.env.E2E_VIETMAP_TILE_KEY ?? '',
       },
       name: 'api',
       reuseExistingServer: reuseDevServers,
@@ -43,7 +45,7 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: `node scripts/copy-maplibre-worker.mjs && npm exec -- next dev --port ${webPort}`,
+      command: `node scripts/copy-vietmap-gl.mjs && npm exec -- next dev --port ${webPort}`,
       cwd: '../web',
       url: webUrl,
       env: { API_BASE_URL: apiUrl, NEXT_PUBLIC_API_BASE_URL: apiUrl },
