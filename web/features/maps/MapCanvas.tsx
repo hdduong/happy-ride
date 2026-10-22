@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getMapConfig } from "./api";
 import { basemapStyle } from "./basemapStyle";
 import { GoogleMap } from "./GoogleMap";
+import { bikeHeadingDegrees, bikeMarkerSvg, personMarkerSvg } from "./markerIcons";
 import type { LatLng, MapClientConfig, MapMarker } from "./types";
 
 export type { MapMarker };
@@ -14,10 +15,11 @@ type LngLatBounds = { extend(lngLat: [number, number]): void };
 type GeoJsonSource = { setData(data: unknown): void };
 type VietMap = {
   addControl(control: unknown, position?: string): void;
-  on(event: "load" | "error", handler: () => void): void;
+  on(event: "load" | "error" | "zoomend" | "dragend", handler: (event?: { originalEvent?: Event }) => void): void;
   addSource(id: string, source: unknown): void;
   addLayer(layer: unknown): void;
   getSource(id: string): GeoJsonSource | undefined;
+  getZoom(): number;
   jumpTo(options: { center: [number, number]; zoom: number }): void;
   fitBounds(bounds: LngLatBounds, options: unknown): void;
   remove(): void;
@@ -28,7 +30,7 @@ type VietMapMarker = {
   remove(): void;
 };
 type VietMapGl = {
-  Map: new (options: { container: HTMLElement; style: string | object; center: [number, number]; zoom: number }) => VietMap;
+  Map: new (options: { container: HTMLElement; style: string | object; center: [number, number]; zoom: number; maxZoom: number }) => VietMap;
   NavigationControl: new (options: { showCompass: boolean }) => unknown;
   Marker: new (options: { element: HTMLElement }) => VietMapMarker;
   LngLatBounds: new () => LngLatBounds;
@@ -147,11 +149,22 @@ function LibreDarkMap({
 }) {
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const [map, setMap] = useState<VietMap | null>(null);
+  const userMoved = useRef(false);
+  const seenCamera = useRef("");
 
   useEffect(() => {
     if (!host) return;
     let created: VietMap | null = null;
     let cancelled = false;
+    const keepUserZoom = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".vietmapgl-ctrl-zoom-in, .vietmapgl-ctrl-zoom-out")) {
+        userMoved.current = true;
+      }
+    };
+    host.addEventListener("click", keepUserZoom);
+    userMoved.current = false;
+    seenCamera.current = "";
     void loadVietMap().then((vietmapgl) => {
       if (cancelled) return;
       const next = new vietmapgl.Map({
@@ -159,6 +172,17 @@ function LibreDarkMap({
         style: basemapStyle(styleUrl),
         center: [center.lng, center.lat],
         zoom,
+        maxZoom: 20,
+      });
+      const rememberZoom = () => {
+        host.dataset.zoom = String(next.getZoom());
+      };
+      next.on("zoomend", (event) => {
+        rememberZoom();
+        if (event?.originalEvent) userMoved.current = true;
+      });
+      next.on("dragend", () => {
+        userMoved.current = true;
       });
       created = next;
       // This fork throws error events that nobody listened for, which takes down the page.
@@ -179,11 +203,13 @@ function LibreDarkMap({
           source: "route",
           paint: { "line-color": "#111111", "line-width": 4 },
         });
+        rememberZoom();
         setMap(next);
       });
     });
     return () => {
       cancelled = true;
+      host.removeEventListener("click", keepUserZoom);
       created?.remove();
       setMap(null);
     };
@@ -198,6 +224,9 @@ function LibreDarkMap({
     const points = [...route, ...markers];
     if (pulse) points.push(pulse);
     if (points.length === 0) points.push(center);
+    const key = points.map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`).join(";");
+    if (userMoved.current || key === seenCamera.current) return;
+    seenCamera.current = key;
     void loadVietMap().then((vietmapgl) => {
       try {
         if (points.length < 2) {
@@ -207,7 +236,7 @@ function LibreDarkMap({
         }
         const bounds = new vietmapgl.LngLatBounds();
         for (const point of points) bounds.extend([point.lng, point.lat]);
-        current.fitBounds(bounds, { padding: { top: 80, bottom: 280, left: 48, right: 48 }, maxZoom: 16, duration: 0 });
+        current.fitBounds(bounds, { padding: { top: 80, bottom: 280, left: 48, right: 48 }, maxZoom: 17, duration: 0 });
       } catch {
         // The map was removed while its style was changing.
       }
@@ -223,10 +252,16 @@ function LibreDarkMap({
       try {
         current = markers.map((marker) => {
           const element = document.createElement("div");
-          const glyph = document.createElement("div");
-          glyph.className = marker.kind === "bike" ? "map-bike" : marker.kind === "dropoff" ? "map-dropoff" : "map-pickup";
-          if (marker.kind === "bike" && marker.heading != null) glyph.style.transform = `rotate(${marker.heading}deg)`;
-          element.appendChild(glyph);
+          element.className = marker.kind === "bike" ? "map-bike" : marker.kind === "dropoff" ? "map-dropoff" : "map-rider";
+          if (marker.kind === "bike") {
+            const glyph = document.createElement("div");
+            glyph.className = "map-bike-heading";
+            glyph.innerHTML = bikeMarkerSvg;
+            glyph.style.transform = `rotate(${bikeHeadingDegrees(marker.heading ?? 0)}deg)`;
+            element.appendChild(glyph);
+          } else if (marker.kind !== "dropoff") {
+            element.innerHTML = personMarkerSvg;
+          }
           return new vietmapgl.Marker({ element }).setLngLat([marker.lng, marker.lat]).addTo(map);
         });
         if (pulse) {
