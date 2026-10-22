@@ -1,6 +1,6 @@
 export function basemapStyle(styleUrl: string): string | {
   version: 8;
-  sources: { vietmap: { type: "raster"; tiles: string[]; tileSize: number; attribution: string } };
+  sources: { vietmap: { type: "raster"; tiles: string[]; tileSize: number; maxzoom: number; attribution: string } };
   layers: { id: string; type: "raster"; source: "vietmap" }[];
 } {
   let parsed: URL;
@@ -22,6 +22,7 @@ export function basemapStyle(styleUrl: string): string | {
         type: "raster",
         tiles: [`https://maps.vietmap.vn/api/${encodeURIComponent(name)}/{z}/{x}/{y}.png?apikey=${encodeURIComponent(key)}`],
         tileSize: 256,
+        maxzoom: 20,
         attribution: "© VietMap",
       },
     },

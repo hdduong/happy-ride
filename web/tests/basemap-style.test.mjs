@@ -10,6 +10,7 @@ test("a VietMap style is drawn from the matching light raster tiles", () => {
   assert.equal(source.type, "raster");
   if (source.type !== "raster") return;
   assert.deepEqual(source.tiles, ["https://maps.vietmap.vn/api/tm/{z}/{x}/{y}.png?apikey=test-key"]);
+  assert.equal(source.maxzoom, 20);
 });
 
 test("other basemap styles stay unchanged", () => {
