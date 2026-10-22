@@ -43,7 +43,7 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: `node scripts/copy-maplibre-worker.mjs && npm exec -- next dev --port ${webPort}`,
+      command: `node scripts/copy-vietmap-gl.mjs && npm exec -- next dev --port ${webPort}`,
       cwd: '../web',
       url: webUrl,
       env: { API_BASE_URL: apiUrl, NEXT_PUBLIC_API_BASE_URL: apiUrl },

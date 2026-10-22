@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
 import { getMapConfig } from "./api";
 import { GoogleDarkMap } from "./GoogleDarkMap";
 import type { LatLng, MapClientConfig, MapMarker } from "./types";
@@ -9,14 +8,58 @@ import type { LatLng, MapClientConfig, MapMarker } from "./types";
 export type { MapMarker };
 
 const darkStyle = "https://tiles.openfreemap.org/styles/dark";
-let workerConfigured = false;
 
-function configureMapWorker(maplibregl: { setWorkerUrl?: (url: string) => void }) {
-  if (workerConfigured || typeof maplibregl.setWorkerUrl !== "function") return;
-  // MapLibre 6 loads vector tiles in this worker. Next does not emit a usable
-  // worker URL on its own, so the basemap stays a blank background.
-  maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
-  workerConfigured = true;
+type LngLatBounds = { extend(lngLat: [number, number]): void };
+type GeoJsonSource = { setData(data: unknown): void };
+type VietMap = {
+  addControl(control: unknown, position?: string): void;
+  on(event: "load", handler: () => void): void;
+  addSource(id: string, source: unknown): void;
+  addLayer(layer: unknown): void;
+  getSource(id: string): GeoJsonSource | undefined;
+  jumpTo(options: { center: [number, number]; zoom: number }): void;
+  fitBounds(bounds: LngLatBounds, options: unknown): void;
+  remove(): void;
+};
+type VietMapMarker = {
+  setLngLat(lngLat: [number, number]): VietMapMarker;
+  addTo(map: VietMap): VietMapMarker;
+  remove(): void;
+};
+type VietMapGl = {
+  Map: new (options: { container: HTMLElement; style: string; center: [number, number]; zoom: number }) => VietMap;
+  NavigationControl: new (options: { showCompass: boolean }) => unknown;
+  Marker: new (options: { element: HTMLElement }) => VietMapMarker;
+  LngLatBounds: new () => LngLatBounds;
+};
+
+declare global {
+  interface Window {
+    vietmapgl?: VietMapGl;
+  }
+}
+
+let vietMapLoading: Promise<VietMapGl> | null = null;
+
+function loadVietMap() {
+  if (window.vietmapgl) return Promise.resolve(window.vietmapgl);
+  if (!vietMapLoading) {
+    // MapLibre GL 6 downloads VietMap tiles and then rejects them
+    // ("Unimplemented type"). VietMap GL 6.0.1 is the fork that draws those
+    // tiles. The prebuilt script keeps its own worker intact.
+    vietMapLoading = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "/vietmap/vietmap-gl.js";
+      script.async = true;
+      script.onload = () => {
+        if (window.vietmapgl) resolve(window.vietmapgl);
+        else reject(new Error("VietMap GL did not start."));
+      };
+      script.onerror = () => reject(new Error("VietMap GL failed to load."));
+      document.head.appendChild(script);
+    });
+  }
+  return vietMapLoading;
 }
 
 export function MapCanvas({
@@ -100,24 +143,24 @@ function LibreDarkMap({
   pulse: LatLng | null;
 }) {
   const [host, setHost] = useState<HTMLDivElement | null>(null);
-  const [map, setMap] = useState<MapLibreMap | null>(null);
+  const [map, setMap] = useState<VietMap | null>(null);
 
   useEffect(() => {
     if (!host) return;
-    let created: MapLibreMap | null = null;
+    let created: VietMap | null = null;
     let cancelled = false;
-    void import("maplibre-gl").then((maplibregl) => {
+    void loadVietMap().then((vietmapgl) => {
       if (cancelled) return;
-      configureMapWorker(maplibregl);
-      const next = new maplibregl.Map({
+      const next = new vietmapgl.Map({
         container: host,
         style: styleUrl,
         center: [center.lng, center.lat],
         zoom,
       });
       created = next;
-      next.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+      next.addControl(new vietmapgl.NavigationControl({ showCompass: false }), "top-right");
       next.on("load", () => {
+        if (cancelled) return;
         next.addSource("route", { type: "geojson", data: lineData(route) });
         next.addLayer({
           id: "route-casing",
@@ -143,18 +186,17 @@ function LibreDarkMap({
 
   useEffect(() => {
     if (!map?.getSource("route")) return;
-    const source = map.getSource("route") as GeoJSONSource | undefined;
-    source?.setData(lineData(route));
+    map.getSource("route")?.setData(lineData(route));
     const points = [...route, ...markers];
     if (pulse) points.push(pulse);
     if (points.length === 0) points.push(center);
-    void import("maplibre-gl").then((module) => {
+    void loadVietMap().then((vietmapgl) => {
       if (points.length < 2) {
         const only = points[0] ?? center;
         map.jumpTo({ center: [only.lng, only.lat], zoom });
         return;
       }
-      const bounds = new module.LngLatBounds();
+      const bounds = new vietmapgl.LngLatBounds();
       for (const point of points) bounds.extend([point.lng, point.lat]);
       map.fitBounds(bounds, { padding: { top: 80, bottom: 280, left: 48, right: 48 }, maxZoom: 16, duration: 0 });
     });
@@ -162,18 +204,17 @@ function LibreDarkMap({
 
   useEffect(() => {
     if (!map) return;
-    let current: Marker[] = [];
+    let current: VietMapMarker[] = [];
     let cancelled = false;
-    void import("maplibre-gl").then((module) => {
+    void loadVietMap().then((vietmapgl) => {
       if (cancelled) return;
-      const maplibregl = module;
       current = markers.map((marker) => {
         const element = document.createElement("div");
         const glyph = document.createElement("div");
         glyph.className = marker.kind === "bike" ? "map-bike" : marker.kind === "dropoff" ? "map-dropoff" : "map-pickup";
         if (marker.kind === "bike" && marker.heading != null) glyph.style.transform = `rotate(${marker.heading}deg)`;
         element.appendChild(glyph);
-        return new maplibregl.Marker({ element }).setLngLat([marker.lng, marker.lat]).addTo(map);
+        return new vietmapgl.Marker({ element }).setLngLat([marker.lng, marker.lat]).addTo(map);
       });
       if (pulse) {
         const element = document.createElement("div");
@@ -181,7 +222,7 @@ function LibreDarkMap({
         const ring = document.createElement("div");
         ring.className = "map-pulse";
         element.appendChild(ring);
-        current.push(new maplibregl.Marker({ element }).setLngLat([pulse.lng, pulse.lat]).addTo(map));
+        current.push(new vietmapgl.Marker({ element }).setLngLat([pulse.lng, pulse.lat]).addTo(map));
       }
     });
     return () => {
