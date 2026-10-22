@@ -43,6 +43,13 @@ public class MapProviderParsingTests
     }
 
     [Fact]
+    public void VietMap_style_url_uses_the_light_basemap()
+    {
+        var url = MapStyles.VietMap("tile-key");
+        Assert.Contains("/maps/styles/tm/style.json?apikey=tile-key", url, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Fake_map_config_exposes_a_dark_style_and_no_browser_key()
     {
         var config = new MapConfiguration("Fake", "dark", MapStyles.Dark);

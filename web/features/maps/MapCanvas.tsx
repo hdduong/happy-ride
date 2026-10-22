@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
+import { basemapStyle } from "./basemapStyle";
 import { getMapConfig } from "./api";
 import { GoogleDarkMap } from "./GoogleDarkMap";
 import type { LatLng, MapClientConfig, MapMarker } from "./types";
@@ -111,7 +112,7 @@ function LibreDarkMap({
       configureMapWorker(maplibregl);
       const next = new maplibregl.Map({
         container: host,
-        style: styleUrl,
+        style: basemapStyle(styleUrl),
         center: [center.lng, center.lat],
         zoom,
       });
@@ -123,13 +124,13 @@ function LibreDarkMap({
           id: "route-casing",
           type: "line",
           source: "route",
-          paint: { "line-color": "#3a3d44", "line-width": 8, "line-opacity": 0.9 },
+          paint: { "line-color": "#ffffff", "line-width": 8, "line-opacity": 0.95 },
         });
         next.addLayer({
           id: "route",
           type: "line",
           source: "route",
-          paint: { "line-color": "#ffffff", "line-width": 4 },
+          paint: { "line-color": "#111111", "line-width": 4 },
         });
         setMap(next);
       });
