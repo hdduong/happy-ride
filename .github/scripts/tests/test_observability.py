@@ -244,7 +244,10 @@ class ObservabilityDeploymentTests(unittest.TestCase):
         self.assertEqual(len(configurations), 1)
         configuration = configurations[0]
         self.assertEqual(configuration[configuration.index("--linux-fx-version") + 1], "NODE|22-lts")
-        self.assertEqual(configuration[configuration.index("--startup-file") + 1], "node server.js")
+        self.assertEqual(
+            configuration[configuration.index("--startup-file") + 1],
+            "rm -rf .next/server/route-cache .next/cache && node server.js",
+        )
         self.assertEqual(configuration[configuration.index("--always-on") + 1], "true")
         self.assertFalse(any(call[:2] == ["webapp", "create"] for call in calls))
         self.assert_no_secret_output(result)
