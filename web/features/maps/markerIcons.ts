@@ -15,7 +15,11 @@ export const bikeMarkerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
   </g>
 </svg>`;
 
-export function bikeMarkerSvgFor(heading: number) {
+export function bikeHeadingDegrees(heading: number) {
   const turn = Number.isFinite(heading) ? heading : 0;
-  return bikeMarkerSvg.replace("<g ", `<g transform="rotate(${turn} 16 16)" `);
+  return turn - 90;
+}
+
+export function bikeMarkerSvgFor(heading: number) {
+  return bikeMarkerSvg.replace("<g ", `<g transform="rotate(${bikeHeadingDegrees(heading)} 16 16)" `);
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getMapConfig } from "./api";
 import { basemapStyle } from "./basemapStyle";
 import { GoogleDarkMap } from "./GoogleDarkMap";
-import { bikeMarkerSvg, personMarkerSvg } from "./markerIcons";
+import { bikeHeadingDegrees, bikeMarkerSvg, personMarkerSvg } from "./markerIcons";
 import type { LatLng, MapClientConfig, MapMarker } from "./types";
 
 export type { MapMarker };
@@ -257,7 +257,7 @@ function LibreDarkMap({
             const glyph = document.createElement("div");
             glyph.className = "map-bike-heading";
             glyph.innerHTML = bikeMarkerSvg;
-            glyph.style.transform = `rotate(${marker.heading ?? 0}deg)`;
+            glyph.style.transform = `rotate(${bikeHeadingDegrees(marker.heading ?? 0)}deg)`;
             element.appendChild(glyph);
           } else if (marker.kind !== "dropoff") {
             element.innerHTML = personMarkerSvg;
