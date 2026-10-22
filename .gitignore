@@ -18,6 +18,7 @@ TestResults/
 .next/
 playwright-report/
 test-results/
+web/public/maplibre/
 *.db
 *.db-shm
 *.db-wal
