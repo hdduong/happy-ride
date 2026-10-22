@@ -42,11 +42,13 @@ jobs:
 
   switch-map:
     name: Switch map provider
-    if: ${{ github.event.inputs.map_provider != '' && github.event.inputs.map_provider != 'none' }}
+    if: ${{ github.event.inputs.deploy != 'true' && (github.event.inputs.map_provider == 'Google' || github.event.inputs.map_provider == 'VietMap') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ vars.WEB_BASE_URL || 'https://app-grabbike-web.azurewebsites.net' }}
     permissions:
-      actions: write
       contents: read
     steps:
       - name: Check out the workflow
@@ -63,12 +65,21 @@ jobs:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           AZURE_API_APP: ${{ vars.AZURE_API_APP_NAME }}
           WEB_BASE_URL: ${{ vars.WEB_BASE_URL }}
-          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/switch-map-provider.sh
+
+  reject-mixed-request:
+    name: Reject a mixed deploy and map switch
+    if: ${{ github.event.inputs.deploy == 'true' && (github.event.inputs.map_provider == 'Google' || github.event.inputs.map_provider == 'VietMap') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask for one action
+        run: |
+          echo "Run a deployment or a map switch, not both in one workflow."
+          exit 1
 
   deploy:
     name: Deploy
-    if: ${{ github.event.inputs.deploy == 'true' }}
+    if: ${{ github.event.inputs.deploy == 'true' && github.event.inputs.map_provider != 'Google' && github.event.inputs.map_provider != 'VietMap' }}
     needs: confirm
     runs-on: ubuntu-latest
     timeout-minutes: 45
