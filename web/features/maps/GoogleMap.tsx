@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { APIProvider, Map, useMap, ColorScheme } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps";
 import { bikeMarkerSvgFor, personMarkerSvg } from "./markerIcons";
 import type { LatLng, MapMarker } from "./types";
 
-export function GoogleDarkMap({
+export function GoogleMap({
   apiKey,
   region,
   language,
@@ -29,9 +29,9 @@ export function GoogleDarkMap({
       <Map
         defaultCenter={{ lat: center.lat, lng: center.lng }}
         defaultZoom={zoom}
-        colorScheme={ColorScheme.DARK}
         gestureHandling="greedy"
         disableDefaultUI
+        clickableIcons={false}
         style={{ width: "100%", height: "100%" }}
       >
         <GoogleOverlays center={center} zoom={zoom} route={route} markers={markers} pulse={pulse} />
@@ -58,9 +58,9 @@ function GoogleOverlays({
   const seenCamera = useRef("");
   useEffect(() => {
     if (!map || !window.google?.maps) return;
-    const maps = window.google?.maps;
-    if (!maps) return;
-    const drawn: google.maps.Marker[] = markers.map((marker) => new maps.Marker({
+    const maps = window.google.maps;
+    const path = route.map((point) => ({ lat: point.lat, lng: point.lng }));
+    const drawn = markers.map((marker) => new maps.Marker({
       map,
       position: { lat: marker.lat, lng: marker.lng },
       icon: marker.kind === "dropoff"
@@ -71,18 +71,14 @@ function GoogleOverlays({
             anchor: new maps.Point(18, 18),
           },
     }));
-    const line = new maps.Polyline({
-      map,
-      path: route.map((point) => ({ lat: point.lat, lng: point.lng })),
-      strokeColor: "#ffffff",
-      strokeWeight: 4,
-    });
+    const casing = new maps.Polyline({ map, path, strokeColor: "#ffffff", strokeWeight: 8 });
+    const line = new maps.Polyline({ map, path, strokeColor: "#111111", strokeWeight: 4 });
     const pulseCircle = pulse
       ? new maps.Circle({
           map,
           center: { lat: pulse.lat, lng: pulse.lng },
           radius: 80,
-          strokeColor: "#ffffff",
+          strokeColor: "#111111",
           strokeOpacity: 0.85,
           strokeWeight: 2,
           fillOpacity: 0,
@@ -118,6 +114,7 @@ function GoogleOverlays({
     });
     return () => {
       for (const marker of drawn) marker.setMap(null);
+      casing.setMap(null);
       line.setMap(null);
       pulseCircle?.setMap(null);
       drag.remove();

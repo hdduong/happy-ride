@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getMapConfig } from "./api";
 import { basemapStyle } from "./basemapStyle";
-import { GoogleDarkMap } from "./GoogleDarkMap";
+import { GoogleMap } from "./GoogleMap";
 import { bikeHeadingDegrees, bikeMarkerSvg, personMarkerSvg } from "./markerIcons";
 import type { LatLng, MapClientConfig, MapMarker } from "./types";
 
@@ -106,7 +106,7 @@ export function MapCanvas({
   if (config.provider === "Google" && config.browserKey) {
     return (
       <div className="map-canvas">
-        <GoogleDarkMap
+        <GoogleMap
           apiKey={config.browserKey}
           region={config.region || "VN"}
           language={config.language || "vi"}
