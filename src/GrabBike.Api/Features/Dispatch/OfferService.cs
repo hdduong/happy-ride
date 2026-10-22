@@ -20,6 +20,8 @@ public sealed class OfferService(
     IDispatchBus dispatchBus,
     IUnitOfWork unitOfWork,
     IRideWriteLock writeLock,
+    IPickupRouter pickupRouter,
+    IPickupRoutes pickupRoutes,
     ILogger<OfferService> logger) : IOfferService
 {
     public async Task<IReadOnlyList<OfferDto>> PendingAsync(Guid driverId, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -44,6 +46,7 @@ public sealed class OfferService(
 
     public async Task<OfferOutcome> AcceptAsync(Guid driverId, Guid offerId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
+        var approach = await PreviewPickupRouteAsync(driverId, offerId, cancellationToken);
         await using var _ = await writeLock.AcquireAsync(cancellationToken);
         var offer = await offers.FindAsync(offerId, cancellationToken);
         if (offer is null)
@@ -70,8 +73,10 @@ public sealed class OfferService(
         driver.CurrentRideId = ride.Id;
         driver.SpeedKmh = 0;
         offer.Status = OfferStatus.Accepted;
+        if (approach is not null)
+            pickupRoutes.Start(ride.Id, approach);
 
-        var view = RideMaps.ToView(ride, driver);
+        var view = RideMaps.ToView(ride, driver, pickupRoutes.Geometry(ride.Id));
         var result = new OfferOutcome.Accepted(view);
         result.Events.Add(new OutboundEvent.StatusChanged(view, ride.RiderId, driver.UserId));
 
@@ -90,6 +95,18 @@ public sealed class OfferService(
             offer.Id, ride.Id, driverId, ride.Status.ToString());
         DispatchLogging.Committed(logger, result.Events);
         return result;
+    }
+
+    private async Task<GeoRoute?> PreviewPickupRouteAsync(Guid driverId, Guid offerId, CancellationToken cancellationToken)
+    {
+        var position = await drivers.ReadPositionAsync(driverId, cancellationToken);
+        var rideId = await offers.ReadRideIdAsync(offerId, cancellationToken);
+        if (position is null || rideId is null)
+            return null;
+        var pickup = await rides.ReadPickupAsync(rideId.Value, cancellationToken);
+        if (pickup is null)
+            return null;
+        return await pickupRouter.ToPickupAsync(position.Value.Lat, position.Value.Lng, pickup, cancellationToken);
     }
 
     public async Task<OfferOutcome> DeclineAsync(Guid driverId, Guid offerId, DateTimeOffset now, CancellationToken cancellationToken = default)

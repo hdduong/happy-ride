@@ -6,6 +6,7 @@ export type LatLng = {
 export type MapMarker = LatLng & {
   kind: "pickup" | "dropoff" | "bike";
   heading?: number;
+  offset?: [number, number];
 };
 
 export type PlacePoint = LatLng & {

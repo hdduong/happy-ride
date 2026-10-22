@@ -7,4 +7,5 @@ public interface IOfferRepository
     Task<List<Offer>> PendingAsync(CancellationToken cancellationToken = default);
     Task<List<Offer>> PendingForDriverAsync(Guid driverId, CancellationToken cancellationToken = default);
     Task<List<Offer>> ForRideAsync(Guid rideId, CancellationToken cancellationToken = default);
+    Task<Guid?> ReadRideIdAsync(Guid id, CancellationToken cancellationToken = default);
 }

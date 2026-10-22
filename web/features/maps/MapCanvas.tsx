@@ -32,7 +32,7 @@ type VietMapMarker = {
 type VietMapGl = {
   Map: new (options: { container: HTMLElement; style: string | object; center: [number, number]; zoom: number; maxZoom: number }) => VietMap;
   NavigationControl: new (options: { showCompass: boolean }) => unknown;
-  Marker: new (options: { element: HTMLElement }) => VietMapMarker;
+  Marker: new (options: { element: HTMLElement; offset?: [number, number] }) => VietMapMarker;
   LngLatBounds: new () => LngLatBounds;
 };
 
@@ -262,7 +262,7 @@ function LibreDarkMap({
           } else if (marker.kind !== "dropoff") {
             element.innerHTML = personMarkerSvg;
           }
-          return new vietmapgl.Marker({ element }).setLngLat([marker.lng, marker.lat]).addTo(map);
+          return new vietmapgl.Marker({ element, offset: marker.offset }).setLngLat([marker.lng, marker.lat]).addTo(map);
         });
         if (pulse) {
           const element = document.createElement("div");

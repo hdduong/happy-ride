@@ -1,10 +1,11 @@
 using GrabBike.Api.Features.Drivers;
+using GrabBike.Api.SharedKernel;
 
 namespace GrabBike.Api.Features.Rides;
 
 public static class RideMaps
 {
-    public static RideView ToView(Ride ride, Driver? driver)
+    public static RideView ToView(Ride ride, Driver? driver, GeoRoute? approachRoute = null)
     {
         DriverSnapshot? snapshot = driver is null
             ? null
@@ -20,7 +21,8 @@ public static class RideMaps
             ride.FareVnd,
             ride.Route,
             ride.Round,
-            snapshot);
+            snapshot,
+            approachRoute);
     }
 
 }

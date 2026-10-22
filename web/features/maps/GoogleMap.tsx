@@ -67,8 +67,11 @@ function GoogleOverlays({
         ? { path: maps.SymbolPath.CIRCLE, scale: 7, fillColor: "#111", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 }
         : {
             url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(marker.kind === "bike" ? bikeMarkerSvgFor(marker.heading ?? 0) : personMarkerSvg)}`,
-            scaledSize: new maps.Size(36, 36),
-            anchor: new maps.Point(18, 18),
+            scaledSize: new maps.Size(marker.kind === "bike" ? 36 : 18, marker.kind === "bike" ? 36 : 18),
+            anchor: new maps.Point(
+              (marker.kind === "bike" ? 18 : 9) - (marker.offset?.[0] ?? 0),
+              (marker.kind === "bike" ? 18 : 9) - (marker.offset?.[1] ?? 0),
+            ),
           },
     }));
     const casing = new maps.Polyline({ map, path, strokeColor: "#ffffff", strokeWeight: 8 });

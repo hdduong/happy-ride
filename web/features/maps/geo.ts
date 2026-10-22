@@ -52,6 +52,26 @@ export function isPlotted(point: LatLng | null | undefined): point is LatLng {
   );
 }
 
+export function routeForStatus(
+  status: string | undefined,
+  approach: GeoLine | null | undefined,
+  trip: GeoLine | null | undefined,
+  fallback: LatLng[],
+): LatLng[] {
+  if (status === "Accepted") {
+    const line = linePoints(approach);
+    if (line.length >= 2) return line;
+  }
+  const quoted = linePoints(trip);
+  if (quoted.length >= 2) return quoted;
+  return fallback;
+}
+
+export function riderPosition(status: string | undefined, pickup: LatLng, driver: LatLng | null): LatLng {
+  if ((status === "InProgress" || status === "DroppedOff") && isPlotted(driver)) return driver;
+  return pickup;
+}
+
 export function linePoints(route: GeoLine | null | undefined): LatLng[] {
   if (!route) return [];
   return route.coordinates

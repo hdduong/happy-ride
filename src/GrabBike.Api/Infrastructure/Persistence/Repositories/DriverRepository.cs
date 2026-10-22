@@ -27,4 +27,22 @@ public sealed class DriverRepository(AppDbContext db) : IDriverRepository
 
     public Task<List<Driver>> ListAsync(CancellationToken cancellationToken = default) =>
         db.Drivers.ToListAsync(cancellationToken);
+
+    public async Task<(double Lat, double Lng)?> ReadPositionAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var position = await db.Drivers.AsNoTracking()
+            .Where(driver => driver.UserId == userId)
+            .Select(driver => new { driver.Lat, driver.Lng })
+            .FirstOrDefaultAsync(cancellationToken);
+        return position is null ? null : (position.Lat, position.Lng);
+    }
+
+    public async Task<List<(Guid UserId, Guid RideId)>> ReadOnTripAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await db.Drivers.AsNoTracking()
+            .Where(driver => driver.Status == DriverStatus.OnTrip && driver.CurrentRideId != null)
+            .Select(driver => new { driver.UserId, RideId = driver.CurrentRideId!.Value })
+            .ToListAsync(cancellationToken);
+        return rows.Select(row => (row.UserId, row.RideId)).ToList();
+    }
 }
