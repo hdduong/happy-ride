@@ -431,3 +431,7 @@ jobs:
           az webapp restart \
             --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
             --name "${AZURE_WEB_APP:-app-grabbike-web}"
+          user="$(az webapp deployment list-publishing-credentials --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" --name "${AZURE_WEB_APP:-app-grabbike-web}" --query publishingUserName -o tsv)"
+          pass="$(az webapp deployment list-publishing-credentials --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" --name "${AZURE_WEB_APP:-app-grabbike-web}" --query publishingPassword -o tsv)"
+          echo "Page scripts on disk:"
+          curl -s -u "$user:$pass" "https://${AZURE_WEB_APP:-app-grabbike-web}.scm.azurewebsites.net/api/vfs/site/wwwroot/.next/server/app/index.html" | tr '"' '\n' | grep -E 'page-|/backend|app-grabbike-api' | head
