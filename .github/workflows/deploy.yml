@@ -8,6 +8,11 @@ on:
         required: true
         type: boolean
         default: false
+      restart_only:
+        description: Only restart the web app and drop its cached page
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -25,13 +30,14 @@ jobs:
     steps:
       - name: Require the deploy checkbox
         run: |
-          if [ "${{ github.event.inputs.deploy }}" != "true" ]; then
+          if [ "${{ github.event.inputs.deploy }}" != "true" ] && [ "${{ github.event.inputs.restart_only }}" != "true" ]; then
             echo "Check Deploy to Azure production, then click Run workflow again."
             exit 1
           fi
 
   deploy:
     name: Deploy
+    if: github.event.inputs.restart_only != 'true'
     needs: confirm
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -309,6 +315,10 @@ jobs:
 
       - name: Restart the web app
         run: |
+          az webapp config set \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name "${AZURE_WEB_APP:-app-grabbike-web}" \
+            --startup-file "rm -rf .next/cache && node server.js"
           az webapp restart \
             --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
             --name "${AZURE_WEB_APP:-app-grabbike-web}"
@@ -394,3 +404,30 @@ jobs:
             gh issue comment "$number" --body "Deployed ${VERSION}. API: ${API_BASE_URL} Web: ${WEB_BASE_URL}"
             gh issue close "$number" --reason completed
           done
+
+  restart:
+    name: Restart web
+    if: github.event.inputs.restart_only == 'true'
+    needs: confirm
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.WEB_BASE_URL || 'https://app-grabbike-web.azurewebsites.net' }}
+    steps:
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Drop the cached page and restart
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          az webapp config set \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name "${AZURE_WEB_APP:-app-grabbike-web}" \
+            --startup-file "rm -rf .next/cache && node server.js"
+          az webapp restart \
+            --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
+            --name "${AZURE_WEB_APP:-app-grabbike-web}"
