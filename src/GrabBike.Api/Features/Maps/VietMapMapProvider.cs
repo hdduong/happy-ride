@@ -11,7 +11,7 @@ public sealed class VietMapMapProvider(HttpClient http, IOptions<MapOptions> opt
         get
         {
             var tileKey = options.Value.VietMap.TileKey;
-            return new MapConfiguration("VietMap", "dark", string.IsNullOrWhiteSpace(tileKey) ? null : MapStyles.VietMapDark(tileKey));
+            return new MapConfiguration("VietMap", "light", string.IsNullOrWhiteSpace(tileKey) ? null : MapStyles.VietMap(tileKey));
         }
     }
 

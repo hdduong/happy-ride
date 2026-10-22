@@ -3,7 +3,7 @@
 :root {
   color-scheme: dark;
   --bg: #000;
-  --map: #16181c;
+  --map: #f4f1ea;
   --muted: #9a9a9a;
   --sheet: #000;
   --line: #1f1f1f;
@@ -192,22 +192,24 @@ h1 {
   height: 0;
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
-  border-bottom: 16px solid #fff;
+  border-bottom: 16px solid #111;
   background: transparent;
+  filter: drop-shadow(0 0 1px #fff);
 }
 
 .map-dropoff {
   width: 14px;
   height: 14px;
   border-radius: 2px;
-  background: #fff;
+  background: #111;
+  box-shadow: 0 0 0 2px #fff;
 }
 
 .map-pulse {
   width: 18px;
   height: 18px;
   background: transparent;
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  border: 2px solid rgba(17, 17, 17, 0.85);
   animation: map-pulse 1.8s ease-out infinite;
 }
 
