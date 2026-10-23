@@ -5,7 +5,7 @@ import { autocomplete, createQuote, getPlace } from "@/features/maps/api";
 import { cancelRide, confirmArrival, createRide, getRide } from "@/features/rides/api";
 import { getUsers } from "@/features/identity/api";
 import { rememberPersona, storedPersona } from "@/features/identity/storage";
-import { pickupForPersona } from "@/features/maps/geo";
+import { finishedPlace, pickupForPersona } from "@/features/maps/geo";
 import { useRideSession } from "@/features/rides/useRideSession";
 import { messageFrom } from "@/shared/api/client";
 import type { Place, Quote } from "@/features/maps/types";
@@ -29,6 +29,7 @@ export function useRiderBooking(userId: string) {
   const [cityAttempt, setCityAttempt] = useState(0);
   const searchSeq = useRef(0);
   const { ride, live, session } = useRideSession(userId, "rider");
+  const stayAtDropoff = useRef(false);
   const allowSearch = !ride && homeReady;
   const pickup = manualPickup ?? home;
   const searchText = editingPickup ? pickupQuery : query;
@@ -57,6 +58,11 @@ export function useRiderBooking(userId: string) {
       cancel = true;
     };
   }, [homeReady, userId, cityAttempt]);
+
+  useEffect(() => {
+    if (ride?.status === "Completed" && !stayAtDropoff.current)
+      session.dismissRide();
+  }, [ride, session]);
 
   useEffect(() => {
     if (!ride) return;
@@ -187,6 +193,9 @@ export function useRiderBooking(userId: string) {
     setBusy(true);
     setError(null);
     try {
+      stayAtDropoff.current = true;
+      const place = finishedPlace(current);
+      if (place) setHome(place);
       await session.command(async () => {
         const updated = await confirmArrival(userId, current.rideId);
         session.receiveRide(updated ?? { ...current, status: "Completed" });
@@ -199,6 +208,8 @@ export function useRiderBooking(userId: string) {
   }
 
   function resetToSearch() {
+    const place = finishedPlace(ride);
+    if (place) setHome(place);
     session.dismissRide();
     setQuote(null);
     setDestination(null);

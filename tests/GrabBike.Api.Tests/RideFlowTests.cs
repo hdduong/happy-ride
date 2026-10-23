@@ -219,6 +219,34 @@ public class RideFlowTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Completed_ride_is_not_the_current_trip()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var an = fixture.Client(An);
+        var khoa = fixture.Client(Khoa);
+        var cancelledId = await CreateRide(an);
+        await Read(await an.PostAsync($"/api/rides/{cancelledId}/cancel", content: null), HttpStatusCode.OK);
+        var cancelled = await Read(await an.GetAsync("/api/rides/current"), HttpStatusCode.OK);
+        Assert.Equal(cancelledId, cancelled.GetProperty("rideId").GetGuid());
+        Assert.Equal("Cancelled", cancelled.GetProperty("status").GetString());
+
+        var rideId = await CreateRide(an);
+        var offerId = await PendingOffer(khoa, rideId);
+        await Read(await khoa.PostAsync($"/api/offers/{offerId}/accept", content: null), HttpStatusCode.OK);
+        Assert.Equal("DriverArrived", await StatusAfter(khoa, $"/api/rides/{rideId}/arrived"));
+        Assert.Equal("InProgress", await StatusAfter(khoa, $"/api/rides/{rideId}/start"));
+        Assert.Equal("DroppedOff", await StatusAfter(khoa, $"/api/rides/{rideId}/dropoff"));
+        var completed = await Read(await an.PostAsync($"/api/rides/{rideId}/confirm-arrival", content: null), HttpStatusCode.OK);
+        Assert.Equal("Completed", completed.GetProperty("status").GetString());
+
+        var current = await an.GetAsync("/api/rides/current");
+        Assert.Equal(HttpStatusCode.NoContent, current.StatusCode);
+        var stored = await Read(await an.GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("Completed", stored.GetProperty("status").GetString());
+        Assert.Equal(rideId, stored.GetProperty("rideId").GetGuid());
+    }
+
+    [Fact]
     public async Task Confirm_before_dropoff_returns_invalid_transition()
     {
         await using var fixture = new ApiFactory(Database);
@@ -327,6 +355,93 @@ public class RideFlowTests(PostgresFixture postgres)
         Assert.NotEqual(Guid.Empty, await PendingOffer(fixture.Client("99999999-9999-9999-9999-999999999999"), rideId));
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), rideId));
         Assert.Equal(Guid.Empty, await PendingOffer(fixture.Client(Khoa), rideId));
+    }
+
+    [Fact]
+    public async Task A_driver_rolls_to_a_nearby_place_after_drop_off()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var id = Guid.Parse(Khoa);
+        double startLat;
+        double startLng;
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var driver = await db.Drivers.FindAsync([id]);
+            Assert.NotNull(driver);
+            startLat = driver.Lat;
+            startLng = driver.Lng;
+            scope.ServiceProvider.GetRequiredService<IDriverRoam>().Begin(id, startLat, startLng);
+        }
+
+        for (var step = 0; step < 40; step++)
+        {
+            await using var scope = fixture.Services.CreateAsyncScope();
+            var simulation = scope.ServiceProvider.GetRequiredService<IDriverSimulationService>();
+            await simulation.AdvanceAsync(DateTimeOffset.UtcNow, 20, CancellationToken.None);
+        }
+
+        await using var check = fixture.Services.CreateAsyncScope();
+        var parked = await check.ServiceProvider.GetRequiredService<AppDbContext>().Drivers.FindAsync([id]);
+        Assert.NotNull(parked);
+        Assert.InRange(HaversineMeters(startLat, startLng, parked.Lat, parked.Lng), 180, 470);
+    }
+
+    [Fact]
+    public async Task Choosing_a_persona_returns_an_idle_driver_to_the_seeded_place()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var id = Guid.Parse(Khoa);
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var driver = await db.Drivers.FindAsync([id]);
+            Assert.NotNull(driver);
+            driver.Lat = 10.8;
+            driver.Lng = 106.8;
+            driver.Heading = 90;
+            driver.SpeedKmh = 30;
+            await db.SaveChangesAsync();
+        }
+
+        await Read(await fixture.Client(Khoa).PostAsync($"/api/dev/users/{Khoa}/home", null), HttpStatusCode.NoContent);
+        await Read(await fixture.Client(An).PostAsync($"/api/dev/users/{An}/home", null), HttpStatusCode.NoContent);
+
+        var users = await Read(await fixture.Client(Khoa).GetAsync("/api/dev/users"), HttpStatusCode.OK);
+        var row = users.EnumerateArray().Single(user => user.GetProperty("id").GetGuid() == id);
+        Assert.Equal(10.7735, row.GetProperty("lat").GetDouble(), 5);
+        Assert.Equal(106.6990, row.GetProperty("lng").GetDouble(), 5);
+
+        await using var check = fixture.Services.CreateAsyncScope();
+        var parked = await check.ServiceProvider.GetRequiredService<AppDbContext>().Drivers.FindAsync([id]);
+        Assert.NotNull(parked);
+        Assert.Equal(0, parked.Heading);
+        Assert.Equal(0, parked.SpeedKmh);
+    }
+
+    [Fact]
+    public async Task Choosing_a_driver_on_a_trip_leaves_their_place()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var id = Guid.Parse(Khoa);
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var driver = await db.Drivers.FindAsync([id]);
+            Assert.NotNull(driver);
+            driver.Lat = 10.8;
+            driver.Lng = 106.8;
+            driver.Status = DriverStatus.OnTrip;
+            await db.SaveChangesAsync();
+        }
+
+        await Read(await fixture.Client(Khoa).PostAsync($"/api/dev/users/{Khoa}/home", null), HttpStatusCode.NoContent);
+
+        await using var check = fixture.Services.CreateAsyncScope();
+        var moved = await check.ServiceProvider.GetRequiredService<AppDbContext>().Drivers.FindAsync([id]);
+        Assert.NotNull(moved);
+        Assert.Equal(10.8, moved.Lat, 5);
+        Assert.Equal(106.8, moved.Lng, 5);
     }
 
     [Fact]
