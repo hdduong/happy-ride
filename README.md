@@ -3,7 +3,7 @@
 [![Build](https://github.com/hdduong/happy-ride/actions/workflows/build.yml/badge.svg)](https://github.com/hdduong/happy-ride/actions/workflows/build.yml)
 [![CI](https://github.com/hdduong/happy-ride/actions/workflows/ci.yml/badge.svg)](https://github.com/hdduong/happy-ride/actions/workflows/ci.yml)
 [![Deployment](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml/badge.svg)](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml)
-[![version](https://img.shields.io/badge/version-v1.0.129-blue?style=flat-square)](https://github.com/hdduong/happy-ride/releases/tag/v1.0.129)
+[![version](https://img.shields.io/badge/version-v1.0.145-blue?style=flat-square)](https://github.com/hdduong/happy-ride/releases/tag/v1.0.145)
 
 A merge into `main` runs **Build** and **CI**. Build compiles the API and the web app. CI runs the API tests and the browser ride test. When both are green, CI opens a deployment request. Azure changes only after you open [Deployment](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml), click **Run workflow**, check **Deploy to Azure production**, and click the green **Run workflow** button.
 
