@@ -13,7 +13,8 @@ public sealed class UserService(
     IUserRepository users,
     IDriverRepository drivers,
     IUnitOfWork unitOfWork,
-    IRideWriteLock writeLock) : IUserService
+    IRideWriteLock writeLock,
+    IDriverRoam roam) : IUserService
 {
     public async Task<IReadOnlyList<DevUserDto>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -57,6 +58,7 @@ public sealed class UserService(
         driver.Lng = lng;
         driver.Heading = 0;
         driver.SpeedKmh = 0;
+        roam.Clear(driver.UserId);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

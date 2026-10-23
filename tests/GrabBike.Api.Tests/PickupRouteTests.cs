@@ -6,6 +6,14 @@ namespace GrabBike.Api.Tests;
 public class PickupRouteTests
 {
     [Fact]
+    public void Offset_lands_about_the_requested_distance_away()
+    {
+        var target = Geo.OffsetMeters(21.03342, 105.82845, 90, 300);
+        var distance = Geo.HaversineMeters(21.03342, 105.82845, target.Lat, target.Lng);
+        Assert.InRange(distance, 290, 310);
+    }
+
+    [Fact]
     public void Advance_follows_the_stored_road_instead_of_the_straight_chord()
     {
         var routes = new PickupRoutes();

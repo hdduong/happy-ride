@@ -135,6 +135,7 @@ builder.Services.AddScoped<IDispatchService, DispatchService>();
 builder.Services.AddScoped<IRideService, RideService>();
 builder.Services.AddScoped<IOfferService, OfferService>();
 
+builder.Services.AddSingleton<IDriverRoam, DriverRoam>();
 builder.Services.AddScoped<IDriverSimulationService, DriverSimulationService>();
 builder.Services.AddScoped<IDispatchExpiryService, DispatchExpiryService>();
 builder.Services.AddScoped<IDispatchMessageHandler, DispatchMessageHandler>();

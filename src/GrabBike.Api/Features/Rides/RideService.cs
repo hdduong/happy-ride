@@ -27,6 +27,7 @@ public sealed class RideService(
     IUnitOfWork unitOfWork,
     IRideWriteLock writeLock,
     IPickupRoutes pickupRoutes,
+    IDriverRoam roam,
     ILogger<RideService> logger) : IRideService
 {
     public async Task<RideOutcome> CreateAsync(Guid riderId, Guid quoteId, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -193,6 +194,13 @@ public sealed class RideService(
 
         if (target == RideStatus.InProgress)
             await SnapToRouteStartAsync(ride, cancellationToken);
+
+        if (target == RideStatus.DroppedOff && ride.DriverId is Guid droppedDriverId)
+        {
+            var dropped = await drivers.FindAsync(droppedDriverId, cancellationToken);
+            if (dropped is not null)
+                roam.Begin(dropped.UserId, dropped.Lat, dropped.Lng);
+        }
 
         var result = await StatusResultAsync(ride, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);

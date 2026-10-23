@@ -330,6 +330,36 @@ public class RideFlowTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_driver_rolls_to_a_nearby_place_after_drop_off()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var id = Guid.Parse(Khoa);
+        double startLat;
+        double startLng;
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var driver = await db.Drivers.FindAsync([id]);
+            Assert.NotNull(driver);
+            startLat = driver.Lat;
+            startLng = driver.Lng;
+            scope.ServiceProvider.GetRequiredService<IDriverRoam>().Begin(id, startLat, startLng);
+        }
+
+        for (var step = 0; step < 40; step++)
+        {
+            await using var scope = fixture.Services.CreateAsyncScope();
+            var simulation = scope.ServiceProvider.GetRequiredService<IDriverSimulationService>();
+            await simulation.AdvanceAsync(DateTimeOffset.UtcNow, 20, CancellationToken.None);
+        }
+
+        await using var check = fixture.Services.CreateAsyncScope();
+        var parked = await check.ServiceProvider.GetRequiredService<AppDbContext>().Drivers.FindAsync([id]);
+        Assert.NotNull(parked);
+        Assert.InRange(HaversineMeters(startLat, startLng, parked.Lat, parked.Lng), 180, 470);
+    }
+
+    [Fact]
     public async Task Choosing_a_persona_returns_an_idle_driver_to_the_seeded_place()
     {
         await using var fixture = new ApiFactory(Database);

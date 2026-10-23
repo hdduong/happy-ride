@@ -29,8 +29,7 @@ export function useRiderBooking(userId: string) {
   const [cityAttempt, setCityAttempt] = useState(0);
   const searchSeq = useRef(0);
   const { ride, live, session } = useRideSession(userId, "rider");
-  const rideRef = useRef(ride);
-  rideRef.current = ride;
+  const stayAtDropoff = useRef(false);
   const allowSearch = !ride && homeReady;
   const pickup = manualPickup ?? home;
   const searchText = editingPickup ? pickupQuery : query;
@@ -39,7 +38,7 @@ export function useRiderBooking(userId: string) {
     let cancel = false;
     const cached = storedPersona();
     if (cached?.id === userId) {
-      setHome(finishedPlace(rideRef.current) ?? pickupForPersona(userId, cached.city));
+      setHome(pickupForPersona(userId, cached.city));
       setHomeReady(true);
     }
     getUsers(userId)
@@ -48,7 +47,7 @@ export function useRiderBooking(userId: string) {
         const person = users.find((user) => user.id === userId);
         if (!person) return;
         rememberPersona(person.id, person.city);
-        setHome(finishedPlace(rideRef.current) ?? pickupForPersona(person.id, person.city));
+        setHome(pickupForPersona(person.id, person.city));
         setCityError(null);
         setHomeReady(true);
       })
@@ -61,9 +60,9 @@ export function useRiderBooking(userId: string) {
   }, [homeReady, userId, cityAttempt]);
 
   useEffect(() => {
-    const place = finishedPlace(ride);
-    if (place) setHome(place);
-  }, [ride]);
+    if (ride?.status === "Completed" && !stayAtDropoff.current)
+      session.dismissRide();
+  }, [ride, session]);
 
   useEffect(() => {
     if (!ride) return;
@@ -194,6 +193,9 @@ export function useRiderBooking(userId: string) {
     setBusy(true);
     setError(null);
     try {
+      stayAtDropoff.current = true;
+      const place = finishedPlace(current);
+      if (place) setHome(place);
       await session.command(async () => {
         const updated = await confirmArrival(userId, current.rideId);
         session.receiveRide(updated ?? { ...current, status: "Completed" });

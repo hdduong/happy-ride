@@ -108,5 +108,21 @@ public static class Geo
         return (lat, lng, heading, moved, segment, offsetM);
     }
 
+    public static (double Lat, double Lng) OffsetMeters(double lat, double lng, double bearingDegrees, double distanceM)
+    {
+        var bearing = DegreesToRadians(bearingDegrees);
+        var latR = DegreesToRadians(lat);
+        var angular = distanceM / EarthRadiusM;
+        var nextLat = Math.Asin(
+            Math.Sin(latR) * Math.Cos(angular) +
+            Math.Cos(latR) * Math.Sin(angular) * Math.Cos(bearing));
+        var nextLng = DegreesToRadians(lng) + Math.Atan2(
+            Math.Sin(bearing) * Math.Sin(angular) * Math.Cos(latR),
+            Math.Cos(angular) - Math.Sin(latR) * Math.Sin(nextLat));
+        var lngDegrees = nextLng * 180d / Math.PI;
+        lngDegrees = (lngDegrees + 540d) % 360d - 180d;
+        return (nextLat * 180d / Math.PI, lngDegrees);
+    }
+
     private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180d;
 }
