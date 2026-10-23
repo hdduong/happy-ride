@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:5081",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Services__Dispatch": "http://localhost:5082",
+        "Services__Realtime": "http://localhost:5084"
+      }
+    }
+  }
+}

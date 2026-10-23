@@ -22,6 +22,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\GrabBike.Api\GrabBike.Api.csproj" />
+    <ProjectReference Include="..\..\src\GrabBike.Shared\GrabBike.Shared.csproj" />
+    <ProjectReference Include="..\..\src\GrabBike.Rides\GrabBike.Rides.csproj" />
+    <ProjectReference Include="..\..\src\GrabBike.Dispatch\GrabBike.Dispatch.csproj" />
+    <ProjectReference Include="..\..\src\GrabBike.Fleet\GrabBike.Fleet.csproj" />
+    <ProjectReference Include="..\..\src\GrabBike.Realtime\GrabBike.Realtime.csproj" />
   </ItemGroup>
 
 </Project>

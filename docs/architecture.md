@@ -1,26 +1,21 @@
 # Application architecture
 
-The current application is a feature-oriented modular monolith: one ASP.NET Core API and one Next.js application. Business features own their behavior and contracts. Infrastructure supplies persistence and realtime delivery. This uses Clean Architecture's dependency direction without adding a separate project for every layer.
+The current application is a set of ASP.NET Core services and one Next.js application. Business features own their behavior and contracts. The services share one database so a ride command stays a single transaction. Infrastructure supplies persistence and realtime delivery.
 
 This document describes the implemented demo. [The build plan](build-plan.md) describes the target MVP, including integrations that are still pending.
 
 ## Backend
 
 ```text
-src/GrabBike.Api/
-  Features/
-    Rides/       ride lifecycle, command outcomes, queries, HTTP endpoints
-    Dispatch/    offers, driver selection, round expiration
-    Drivers/     driver state and simulated movement
-    Maps/        places, route quotes, fake map behavior
-    Dev/         seeded user identity and development endpoints
-    Telemetry/   bounded client activity intake and actor/ride association checks
-    Realtime/    notification contracts and realtime integration
-  Infrastructure/
-    Persistence/ EF context, repository implementations, write serialization
-  SharedKernel/  common geographic values and persistence ports
-  Program.cs     dependency injection and application startup
+src/GrabBike.Api/        public edge. Hosts every service in one process for deploy and tests.
+src/GrabBike.Rides/      ride lifecycle. Port 5081. Calls dispatch and realtime over HTTP.
+src/GrabBike.Dispatch/   offers, nearest driver, round expiry. Port 5082.
+src/GrabBike.Fleet/      drivers, simulation, places, and route quotes. Port 5083.
+src/GrabBike.Realtime/   SignalR hub. Port 5084.
+src/GrabBike.Shared/     contracts, identity, telemetry, and the shared database.
 ```
+
+`dotnet run --project src/GrabBike.Api` still serves the whole API at http://localhost:5080. Run the four service projects instead when each process should own its own port. Those processes need `Services:Dispatch` and `Services:Realtime` so ride commands and live events cross the process boundary. Production publish still starts `GrabBike.Api`, which keeps the services in one process until each service is deployed on its own.
 
 Each feature keeps its models, contracts, application services, and repository interfaces together. A controller is the HTTP adapter for a feature: it validates transport input and maps application outcomes to status codes and JSON. Application services own use cases and depend on repository interfaces; they do not choose HTTP statuses or access the EF context directly.
 

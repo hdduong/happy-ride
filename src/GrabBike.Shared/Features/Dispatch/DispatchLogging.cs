@@ -3,7 +3,7 @@ using GrabBike.Api.Features.Rides;
 
 namespace GrabBike.Api.Features.Dispatch;
 
-internal static class DispatchLogging
+public static class DispatchLogging
 {
     // Dispatch decisions can be part of booking, declining or the expiry job.
     // Their caller owns persistence and invokes this only after a successful save.

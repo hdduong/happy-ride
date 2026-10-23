@@ -1,9 +1,15 @@
+using System.Text.Json.Serialization;
 using GrabBike.Api.Features.Dispatch;
 using GrabBike.Api.Features.Drivers;
 using GrabBike.Api.Features.Rides;
 
 namespace GrabBike.Api.Features.Realtime;
 
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(OutboundEvent.OfferReceived), "offer")]
+[JsonDerivedType(typeof(OutboundEvent.OfferClosed), "offerClosed")]
+[JsonDerivedType(typeof(OutboundEvent.StatusChanged), "status")]
+[JsonDerivedType(typeof(OutboundEvent.Location), "location")]
 public abstract record OutboundEvent
 {
     public sealed record OfferReceived(Guid DriverId, OfferDto Offer) : OutboundEvent;
