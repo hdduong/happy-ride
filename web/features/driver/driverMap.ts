@@ -19,6 +19,7 @@ export function driverMap({ ride, live, offer, center, me }: Pick<DriverDashboar
         ? [offer.pickup, offer.dropoff]
         : [],
     driverPoint,
+    ride?.rideId,
   );
   const markers: MapMarker[] = [];
   const pickupPoint = ride?.pickup ?? offer?.pickup ?? null;

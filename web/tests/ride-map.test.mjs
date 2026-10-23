@@ -74,6 +74,17 @@ test("reaching the destination removes the last driven segment", () => {
   }, line, { lng: 105.826, lat: 21.028 }), []);
 });
 
+test("a second booking of the same road starts the line at the new bike", () => {
+  const trip = { type: "LineString", coordinates: [[105.84, 21.04], [105.846, 21.038]] };
+  const end = { lng: 105.846, lat: 21.038 };
+  assert.deepEqual(routeForStatus("InProgress", null, trip, [], end, "ride-a"), []);
+  const restart = routeForStatus("InProgress", null, trip, [], { lng: 105.841, lat: 21.039667 }, "ride-b");
+  assert.ok(restart.length >= 2);
+  assert.ok(restart[0].lng > 105.8404);
+  assert.ok(restart[0].lng < 105.842);
+  assert.equal(restart.at(-1).lng, 105.846);
+});
+
 test("a started ride keeps the rider on the bike", () => {
   const pickup = { lat: 21.03, lng: 105.82 };
   const driver = { lat: 21.036, lng: 105.831 };

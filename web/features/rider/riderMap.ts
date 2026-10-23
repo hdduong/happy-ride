@@ -25,6 +25,7 @@ export function riderMap({ ride, live, pickup: selected, destination, quote }: P
     ride ? ride.route : quote?.route,
     dropoff && (ride || quote) && isPlotted(dropoff) ? [pickup, dropoff] : [],
     driverPoint,
+    ride?.rideId,
   );
   const headingTarget =
     ride && (ride.status === "InProgress" || ride.status === "DroppedOff" || ride.status === "Completed")

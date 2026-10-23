@@ -58,6 +58,7 @@ export function routeForStatus(
   trip: GeoLine | null | undefined,
   fallback: LatLng[],
   progress?: LatLng | null,
+  rideId?: string | null,
 ): LatLng[] {
   let line: LatLng[];
   if (status === "Accepted") {
@@ -68,17 +69,23 @@ export function routeForStatus(
   }
   if (line.length < 2) line = fallback;
   if (!isPlotted(progress)) return line;
-  return remainingLine(line, progress);
+  return remainingLine(line, progress, 60, rideId);
 }
 
 const reachedAlongM = new Map<string, number>();
 const backwardSlackM = 15;
 const sameRoadM = 12;
+let activeProgressRide: string | null = null;
 
 // Drop the road already driven. Progress only moves forward, and a nearby later
-// leg does not replace the leg the bike is still on.
-export function remainingLine(points: LatLng[], current: LatLng, maxDistanceM = 60): LatLng[] {
+// leg does not replace the leg the bike is still on. A new ride starts over.
+export function remainingLine(points: LatLng[], current: LatLng, maxDistanceM = 60, rideId?: string | null): LatLng[] {
   if (points.length < 2 || !isPlotted(current)) return points;
+  const rideKey = rideId && rideId.length > 0 ? rideId : "preview";
+  if (activeProgressRide !== rideKey) {
+    reachedAlongM.clear();
+    activeProgressRide = rideKey;
+  }
   const totals = [0];
   for (let i = 1; i < points.length; i++) totals.push(totals[i - 1] + haversineMeters(points[i - 1], points[i]));
   const key = routeProgressKey(points);
