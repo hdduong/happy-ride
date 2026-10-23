@@ -64,7 +64,7 @@ public sealed class OfferService(
             return new OfferOutcome.Conflict("Taken");
         if (driver.CurrentRideId is not null || driver.Status == DriverStatus.OnTrip)
             return new OfferOutcome.Conflict("Busy");
-        if (offer.Status != OfferStatus.Pending)
+        if (offer.Status != OfferStatus.Pending || offer.ExpiresAt <= now)
             return new OfferOutcome.Conflict("Closed");
 
         ride.Status = RideStatus.Accepted;
