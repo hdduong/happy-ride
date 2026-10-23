@@ -1,13 +1,19 @@
 using GrabBike.Api.Features.Drivers;
+using GrabBike.Api.SharedKernel;
 
 namespace GrabBike.Api.Features.Dev;
 
 public interface IUserService
 {
     Task<IReadOnlyList<DevUserDto>> ListAsync(CancellationToken cancellationToken = default);
+    Task ReturnHomeAsync(User user, CancellationToken cancellationToken = default);
 }
 
-public sealed class UserService(IUserRepository users, IDriverRepository drivers) : IUserService
+public sealed class UserService(
+    IUserRepository users,
+    IDriverRepository drivers,
+    IUnitOfWork unitOfWork,
+    IRideWriteLock writeLock) : IUserService
 {
     public async Task<IReadOnlyList<DevUserDto>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -35,5 +41,22 @@ public sealed class UserService(IUserRepository users, IDriverRepository drivers
                     lng);
             })
             .ToList();
+    }
+
+    public async Task ReturnHomeAsync(User user, CancellationToken cancellationToken = default)
+    {
+        if (user.Role != UserRole.Driver || !DemoHomes.TryDriver(user.Id, out var lat, out var lng))
+            return;
+
+        await using var _ = await writeLock.AcquireAsync(cancellationToken);
+        var driver = await drivers.FindAsync(user.Id, cancellationToken);
+        if (driver is null || driver.CurrentRideId is not null || driver.Status == DriverStatus.OnTrip)
+            return;
+
+        driver.Lat = lat;
+        driver.Lng = lng;
+        driver.Heading = 0;
+        driver.SpeedKmh = 0;
+        await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

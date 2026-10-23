@@ -1,6 +1,6 @@
 "use client";
 
-import { getUsers } from "./api";
+import { getUsers, returnHome } from "./api";
 import { messageFrom } from "@/shared/api/client";
 import type { DevUser } from "./types";
 import { forcedUserId, homeForRole, isDriverRole, rememberPersona } from "./storage";
@@ -27,8 +27,9 @@ export function UserPicker() {
         if (!forced) return;
         const match = list.find((user) => user.id === forced);
         if (match) {
-          rememberPersona(match.id, match.city);
-          router.replace(homeForRole(match.role));
+          void openAtHome(match).then(() => {
+            if (!cancel) router.replace(homeForRole(match.role));
+          });
         }
       })
       .catch((reason: unknown) => {
@@ -43,8 +44,7 @@ export function UserPicker() {
   }, [router]);
 
   function choose(user: DevUser) {
-    rememberPersona(user.id, user.city);
-    router.push(homeForRole(user.role));
+    void openAtHome(user).then(() => router.push(homeForRole(user.role)));
   }
 
   const cities = citiesInOrder(users);
@@ -131,6 +131,15 @@ function CityPeople({
       ))}
     </div>
   );
+}
+
+async function openAtHome(user: DevUser) {
+  rememberPersona(user.id, user.city);
+  try {
+    await returnHome(user.id);
+  } catch {
+    // The screen still opens at the last saved place if the reset cannot be saved.
+  }
 }
 
 function roleLabel(user: DevUser): string {

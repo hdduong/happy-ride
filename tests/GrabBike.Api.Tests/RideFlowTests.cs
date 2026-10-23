@@ -330,6 +330,63 @@ public class RideFlowTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Choosing_a_persona_returns_an_idle_driver_to_the_seeded_place()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var id = Guid.Parse(Khoa);
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var driver = await db.Drivers.FindAsync([id]);
+            Assert.NotNull(driver);
+            driver.Lat = 10.8;
+            driver.Lng = 106.8;
+            driver.Heading = 90;
+            driver.SpeedKmh = 30;
+            await db.SaveChangesAsync();
+        }
+
+        await Read(await fixture.Client(Khoa).PostAsync($"/api/dev/users/{Khoa}/home", null), HttpStatusCode.NoContent);
+        await Read(await fixture.Client(An).PostAsync($"/api/dev/users/{An}/home", null), HttpStatusCode.NoContent);
+
+        var users = await Read(await fixture.Client(Khoa).GetAsync("/api/dev/users"), HttpStatusCode.OK);
+        var row = users.EnumerateArray().Single(user => user.GetProperty("id").GetGuid() == id);
+        Assert.Equal(10.7735, row.GetProperty("lat").GetDouble(), 5);
+        Assert.Equal(106.6990, row.GetProperty("lng").GetDouble(), 5);
+
+        await using var check = fixture.Services.CreateAsyncScope();
+        var parked = await check.ServiceProvider.GetRequiredService<AppDbContext>().Drivers.FindAsync([id]);
+        Assert.NotNull(parked);
+        Assert.Equal(0, parked.Heading);
+        Assert.Equal(0, parked.SpeedKmh);
+    }
+
+    [Fact]
+    public async Task Choosing_a_driver_on_a_trip_leaves_their_place()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var id = Guid.Parse(Khoa);
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var driver = await db.Drivers.FindAsync([id]);
+            Assert.NotNull(driver);
+            driver.Lat = 10.8;
+            driver.Lng = 106.8;
+            driver.Status = DriverStatus.OnTrip;
+            await db.SaveChangesAsync();
+        }
+
+        await Read(await fixture.Client(Khoa).PostAsync($"/api/dev/users/{Khoa}/home", null), HttpStatusCode.NoContent);
+
+        await using var check = fixture.Services.CreateAsyncScope();
+        var moved = await check.ServiceProvider.GetRequiredService<AppDbContext>().Drivers.FindAsync([id]);
+        Assert.NotNull(moved);
+        Assert.Equal(10.8, moved.Lat, 5);
+        Assert.Equal(106.8, moved.Lng, 5);
+    }
+
+    [Fact]
     public async Task Startup_moves_HanoiD01_only_from_the_old_seed_and_never_during_a_trip()
     {
         await using var fixture = new ApiFactory(Database);
