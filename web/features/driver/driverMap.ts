@@ -18,6 +18,8 @@ export function driverMap({ ride, live, offer, center, me }: Pick<DriverDashboar
       : offer && isPlotted(offer.pickup) && isPlotted(offer.dropoff)
         ? [offer.pickup, offer.dropoff]
         : [],
+    driverPoint,
+    ride?.rideId,
   );
   const markers: MapMarker[] = [];
   const pickupPoint = ride?.pickup ?? offer?.pickup ?? null;
