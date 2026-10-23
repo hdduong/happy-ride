@@ -73,6 +73,17 @@ test("reaching the destination removes the last driven segment", () => {
   }, line, { lng: 105.826, lat: 21.028 }), []);
 });
 
+test("arrival clears a short final segment", () => {
+  const line = [
+    { lat: 21.03, lng: 105.82 },
+    { lat: 21.03, lng: 105.825 },
+    { lat: 21.03005, lng: 105.825 },
+  ];
+  const rideId = "short-final-segment-regression";
+  remainingLine(line, line[1], 60, rideId);
+  assert.deepEqual(remainingLine(line, line[2], 60, rideId), []);
+});
+
 test("a second booking of the same road starts the line at the new bike", () => {
   const trip = { type: "LineString", coordinates: [[105.84, 21.04], [105.846, 21.038]] };
   const end = { lng: 105.846, lat: 21.038 };

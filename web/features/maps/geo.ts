@@ -90,6 +90,11 @@ export function remainingLine(points: LatLng[], current: LatLng, maxDistanceM = 
   const totals = [0];
   for (let i = 1; i < points.length; i++) totals.push(totals[i - 1] + haversineMeters(points[i - 1], points[i]));
   const key = routeProgressKey(points);
+  const end = points[points.length - 1];
+  if (haversineMeters(current, end) < 1) {
+    reachedAlongM.set(key, totals[totals.length - 1]);
+    return [];
+  }
   const previous = reachedAlongM.get(key) ?? 0;
   const minAlong = Math.max(0, previous - backwardSlackM);
   const candidates: { index: number; point: LatLng; distanceM: number; alongM: number }[] = [];
