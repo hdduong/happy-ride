@@ -3,16 +3,18 @@
 import { getUsers, returnHome } from "./api";
 import { messageFrom } from "@/shared/api/client";
 import type { DevUser } from "./types";
+import { isCurrentPersonaChoice, takePersonaChoice } from "./personaChoice";
 import { forcedUserId, homeForRole, isDriverRole, rememberPersona } from "./storage";
 import { MapCanvas } from "@/features/maps/MapCanvas";
 import { HANOI_CENTER } from "@/features/maps/geo";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const cityOrder = ["Hanoi", "HCMC"];
 
 export function UserPicker() {
   const router = useRouter();
+  const choice = useRef({ ticket: 0 });
   const [users, setUsers] = useState<DevUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +29,8 @@ export function UserPicker() {
         if (!forced) return;
         const match = list.find((user) => user.id === forced);
         if (match) {
-          void openAtHome(match).then(() => {
-            if (!cancel) router.replace(homeForRole(match.role));
+          void openAtHome(match, choice.current).then((current) => {
+            if (!cancel && current) router.replace(homeForRole(match.role));
           });
         }
       })
@@ -44,7 +46,9 @@ export function UserPicker() {
   }, [router]);
 
   function choose(user: DevUser) {
-    void openAtHome(user).then(() => router.push(homeForRole(user.role)));
+    void openAtHome(user, choice.current).then((current) => {
+      if (current) router.push(homeForRole(user.role));
+    });
   }
 
   const cities = citiesInOrder(users);
@@ -133,13 +137,15 @@ function CityPeople({
   );
 }
 
-async function openAtHome(user: DevUser) {
+async function openAtHome(user: DevUser, choice: { ticket: number }) {
+  const ticket = takePersonaChoice(choice);
   rememberPersona(user.id, user.city);
   try {
     await returnHome(user.id);
   } catch {
     // The screen still opens at the last saved place if the reset cannot be saved.
   }
+  return isCurrentPersonaChoice(ticket, choice);
 }
 
 function roleLabel(user: DevUser): string {
