@@ -35,13 +35,17 @@ public sealed class RideRepository(AppDbContext db) : IRideRepository
         if (active is not null)
             return active;
 
-        return await db.Rides
+        // A completed trip stays on the screen that confirmed it. Opening the rider
+        // again asks for the current ride, so that trip must not come back. Keep it
+        // in this query so an older cancelled or no-driver ride does not replace it.
+        var latest = await db.Rides
             .Where(ride => ride.RiderId == riderId &&
                 (ride.Status == RideStatus.NoDriver ||
                  ride.Status == RideStatus.Cancelled ||
                  ride.Status == RideStatus.Completed))
             .OrderByDescending(ride => ride.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
+        return latest is { Status: RideStatus.Completed } ? null : latest;
     }
 
     public Task<List<Ride>> ListSearchingAsync(CancellationToken cancellationToken = default) =>

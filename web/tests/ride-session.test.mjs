@@ -62,6 +62,7 @@ for (const role of ["rider", "driver"]) {
 
 test("a dismissed terminal rider ride stays hidden when old events and polls arrive", () => {
   const session = createRideSession("rider");
+  session.receiveRide(ride("DroppedOff"));
   session.receiveRide(ride("Completed"));
   session.dismissRide();
   session.receiveRide(ride("Accepted"));
@@ -70,6 +71,26 @@ test("a dismissed terminal rider ride stays hidden when old events and polls arr
   session.receiveRide(ride("Searching", "ride-2"));
   session.receiveRide(ride("Completed"));
   assert.equal(session.getSnapshot().ride.rideId, "ride-2");
+});
+
+test("opening the rider again does not restore a completed trip", () => {
+  const session = createRideSession("rider");
+  session.receivePoll(session.pollRevision(), { ride: ride("Completed"), offers: [] });
+  session.receiveRide(ride("Completed"));
+  assert.equal(session.getSnapshot().ride, null);
+
+  session.receiveRide(ride("DroppedOff"));
+  session.receiveRide(ride("Completed"));
+  assert.equal(session.getSnapshot().ride.status, "Completed");
+  session.receivePoll(session.pollRevision(), { ride: null, offers: [] });
+  assert.equal(session.getSnapshot().ride.status, "Completed");
+
+  const later = createRideSession("rider");
+  later.receiveRide(ride("InProgress", "ride-2"));
+  later.receivePoll(later.pollRevision(), { ride: ride("Completed"), offers: [] });
+  later.receiveRide(ride("Completed"));
+  assert.equal(later.getSnapshot().ride.rideId, "ride-2");
+  assert.equal(later.getSnapshot().ride.status, "InProgress");
 });
 
 test("closed driver rides cannot return and a late closure cannot clear a different ride", () => {

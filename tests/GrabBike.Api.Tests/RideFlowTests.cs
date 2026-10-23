@@ -219,6 +219,34 @@ public class RideFlowTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Completed_ride_is_not_the_current_trip()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var an = fixture.Client(An);
+        var khoa = fixture.Client(Khoa);
+        var cancelledId = await CreateRide(an);
+        await Read(await an.PostAsync($"/api/rides/{cancelledId}/cancel", content: null), HttpStatusCode.OK);
+        var cancelled = await Read(await an.GetAsync("/api/rides/current"), HttpStatusCode.OK);
+        Assert.Equal(cancelledId, cancelled.GetProperty("rideId").GetGuid());
+        Assert.Equal("Cancelled", cancelled.GetProperty("status").GetString());
+
+        var rideId = await CreateRide(an);
+        var offerId = await PendingOffer(khoa, rideId);
+        await Read(await khoa.PostAsync($"/api/offers/{offerId}/accept", content: null), HttpStatusCode.OK);
+        Assert.Equal("DriverArrived", await StatusAfter(khoa, $"/api/rides/{rideId}/arrived"));
+        Assert.Equal("InProgress", await StatusAfter(khoa, $"/api/rides/{rideId}/start"));
+        Assert.Equal("DroppedOff", await StatusAfter(khoa, $"/api/rides/{rideId}/dropoff"));
+        var completed = await Read(await an.PostAsync($"/api/rides/{rideId}/confirm-arrival", content: null), HttpStatusCode.OK);
+        Assert.Equal("Completed", completed.GetProperty("status").GetString());
+
+        var current = await an.GetAsync("/api/rides/current");
+        Assert.Equal(HttpStatusCode.NoContent, current.StatusCode);
+        var stored = await Read(await an.GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("Completed", stored.GetProperty("status").GetString());
+        Assert.Equal(rideId, stored.GetProperty("rideId").GetGuid());
+    }
+
+    [Fact]
     public async Task Confirm_before_dropoff_returns_invalid_transition()
     {
         await using var fixture = new ApiFactory(Database);

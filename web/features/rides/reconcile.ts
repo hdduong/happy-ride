@@ -38,6 +38,11 @@ export function applyRiderUpdate(
   incoming: RideView | null,
   ignored: ReadonlySet<string>,
 ): RideView | null {
+  // The confirmation screen already holds this ride. A new visit, or a delayed
+  // event for a different trip, must not draw that finished route again.
+  if (incoming?.status === "Completed" && previous?.rideId !== incoming.rideId) {
+    return previous;
+  }
   if (incoming && ignored.has(incoming.rideId) && !isActiveStatus(incoming.status)) {
     return previous && !isActiveStatus(previous.status) ? previous : null;
   }
