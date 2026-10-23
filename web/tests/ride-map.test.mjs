@@ -44,16 +44,30 @@ test("the line starts at the bike after the spur behind it has been passed", () 
   });
 });
 
+test("a nearby later leg does not erase the road still ahead", () => {
+  const outAndBack = [
+    { lng: 105.82, lat: 21.03 },
+    { lng: 105.825, lat: 21.03 },
+    { lng: 105.825, lat: 21.02992 },
+    { lng: 105.82, lat: 21.02992 },
+  ];
+  const onTheWayOut = remainingLine(outAndBack, { lng: 105.822, lat: 21.03 });
+  assert.ok(onTheWayOut.some((point) => point.lng === 105.825 && point.lat === 21.03));
+  assert.ok(onTheWayOut[0].lng > 105.8205);
+  const stillOut = remainingLine(outAndBack, { lng: 105.822, lat: 21.02992 });
+  assert.ok(stillOut.some((point) => point.lng === 105.825 && point.lat === 21.03));
+});
+
 test("reaching the destination removes the last driven segment", () => {
   const line = [
-    { lng: 105.82, lat: 21.03 },
-    { lng: 105.826, lat: 21.028 },
+    { lng: 105.821, lat: 21.031 },
+    { lng: 105.827, lat: 21.029 },
   ];
-  assert.deepEqual(remainingLine(line, { lng: 105.826, lat: 21.028 }), []);
-  const underway = remainingLine(line, { lng: 105.823, lat: 21.029 });
+  const underway = remainingLine(line, { lng: 105.824, lat: 21.03 });
   assert.ok(underway.length >= 2);
-  assert.ok(underway[0].lng > 105.822);
-  assert.equal(underway.at(-1).lng, 105.826);
+  assert.ok(underway[0].lng > 105.823);
+  assert.equal(underway.at(-1).lng, 105.827);
+  assert.deepEqual(remainingLine(line, { lng: 105.827, lat: 21.029 }), []);
   assert.deepEqual(routeForStatus("DroppedOff", null, {
     type: "LineString",
     coordinates: [[105.82, 21.03], [105.826, 21.028]],

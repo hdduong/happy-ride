@@ -71,30 +71,54 @@ export function routeForStatus(
   return remainingLine(line, progress);
 }
 
-// Drop the road already driven. The bike stays on the line, and the line continues to the destination.
+const reachedAlongM = new Map<string, number>();
+const backwardSlackM = 15;
+const sameRoadM = 12;
+
+// Drop the road already driven. Progress only moves forward, and a nearby later
+// leg does not replace the leg the bike is still on.
 export function remainingLine(points: LatLng[], current: LatLng, maxDistanceM = 60): LatLng[] {
   if (points.length < 2 || !isPlotted(current)) return points;
-  let best = Number.POSITIVE_INFINITY;
-  let index = 0;
-  let snap = points[0];
+  const totals = [0];
+  for (let i = 1; i < points.length; i++) totals.push(totals[i - 1] + haversineMeters(points[i - 1], points[i]));
+  const key = routeProgressKey(points);
+  const minAlong = Math.max(0, (reachedAlongM.get(key) ?? 0) - backwardSlackM);
+  const candidates: { index: number; point: LatLng; distanceM: number; alongM: number }[] = [];
   for (let i = 0; i < points.length - 1; i++) {
     const projected = closestOnSegment(points[i], points[i + 1], current);
-    if (projected.distanceM < best) {
-      best = projected.distanceM;
-      index = i;
-      snap = projected.point;
-    }
+    if (projected.distanceM > maxDistanceM) continue;
+    const alongM = totals[i] + projected.alongSegmentM;
+    if (alongM + 0.5 < minAlong) continue;
+    candidates.push({ index: i, point: projected.point, distanceM: projected.distanceM, alongM });
   }
-  if (best > maxDistanceM) return points;
+  if (candidates.length === 0) return points;
+  const nearest = Math.min(...candidates.map((candidate) => candidate.distanceM));
+  const chosen = candidates
+    .filter((candidate) => candidate.distanceM <= nearest + sameRoadM)
+    .reduce((earliest, candidate) => (candidate.alongM < earliest.alongM ? candidate : earliest));
+  reachedAlongM.set(key, Math.max(reachedAlongM.get(key) ?? 0, chosen.alongM));
+  return cutAhead(points, chosen.index, chosen.point);
+}
+
+function cutAhead(points: LatLng[], index: number, snap: LatLng): LatLng[] {
   const ahead = points.slice(index + 1);
   if (ahead.length === 0) return [];
   if (haversineMeters(snap, ahead[0]) < 1) return ahead.length >= 2 ? ahead : [];
   return [snap, ...ahead];
 }
 
-function closestOnSegment(start: LatLng, end: LatLng, point: LatLng): { point: LatLng; distanceM: number } {
+function routeProgressKey(points: LatLng[]): string {
+  const first = points[0];
+  const middle = points[Math.floor(points.length / 2)];
+  const last = points[points.length - 1];
+  return [points.length, first.lat, first.lng, middle.lat, middle.lng, last.lat, last.lng]
+    .map((value) => (typeof value === "number" ? value.toFixed(5) : String(value)))
+    .join(":");
+}
+
+function closestOnSegment(start: LatLng, end: LatLng, point: LatLng): { point: LatLng; distanceM: number; alongSegmentM: number } {
   const lengthM = haversineMeters(start, end);
-  if (lengthM < 0.5) return { point: start, distanceM: haversineMeters(start, point) };
+  if (lengthM < 0.5) return { point: start, distanceM: haversineMeters(start, point), alongSegmentM: 0 };
   const meanLat = toRadians((start.lat + end.lat) / 2);
   const east = (lng: number) => toRadians(lng) * Math.cos(meanLat) * 6_371_000;
   const north = (lat: number) => toRadians(lat) * 6_371_000;
@@ -112,7 +136,7 @@ function closestOnSegment(start: LatLng, end: LatLng, point: LatLng): { point: L
     lat: start.lat + (end.lat - start.lat) * t,
     lng: start.lng + (end.lng - start.lng) * t,
   };
-  return { point: snapped, distanceM: haversineMeters(snapped, point) };
+  return { point: snapped, distanceM: haversineMeters(snapped, point), alongSegmentM: t * lengthM };
 }
 
 export function riderPosition(status: string | undefined, pickup: LatLng, driver: LatLng | null): LatLng {
