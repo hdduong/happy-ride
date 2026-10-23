@@ -13,18 +13,19 @@ export function riderMap({ ride, live, pickup: selected, destination, quote }: P
     (destination
       ? { lat: destination.lat, lng: destination.lng, address: destination.name || destination.address }
       : null);
-  const route = routeForStatus(
-    ride?.status,
-    ride?.approachRoute,
-    ride ? ride.route : quote?.route,
-    dropoff && (ride || quote) && isPlotted(dropoff) ? [pickup, dropoff] : [],
-  );
   const driverLive = live && ride && live.rideId === ride.rideId ? live : null;
   const driverPoint = driverLive
     ? { lat: driverLive.lat, lng: driverLive.lng }
     : ride?.driver
       ? { lat: ride.driver.lat, lng: ride.driver.lng }
       : null;
+  const route = routeForStatus(
+    ride?.status,
+    ride?.approachRoute,
+    ride ? ride.route : quote?.route,
+    dropoff && (ride || quote) && isPlotted(dropoff) ? [pickup, dropoff] : [],
+    driverPoint,
+  );
   const headingTarget =
     ride && (ride.status === "InProgress" || ride.status === "DroppedOff" || ride.status === "Completed")
       ? ride.dropoff

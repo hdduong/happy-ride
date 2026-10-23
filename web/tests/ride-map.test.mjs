@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { riderPosition, routeForStatus } from "../features/maps/geo.ts";
+import { remainingLine, riderPosition, routeForStatus } from "../features/maps/geo.ts";
 
 test("an accepted ride draws the road to the rider", () => {
   const route = routeForStatus(
@@ -14,6 +14,34 @@ test("an accepted ride draws the road to the rider", () => {
     [105.81, 21.025],
     [105.82, 21.03],
   ]);
+});
+
+test("the line starts at the bike after the spur behind it has been passed", () => {
+  const approach = {
+    type: "LineString",
+    coordinates: [
+      [105.82, 21.03],
+      [105.82, 21.0304],
+      [105.823, 21.0304],
+      [105.826, 21.028],
+    ],
+  };
+  const trip = { type: "LineString", coordinates: [[105.826, 21.028], [105.83, 21.02]] };
+  const bike = { lng: 105.8215, lat: 21.0304 };
+  const route = routeForStatus("Accepted", approach, trip, [], bike);
+  assert.ok(route[0].lng > 105.8204, "the line still starts on the spur behind the bike");
+  assert.equal(route.at(-1).lng, 105.826);
+  assert.ok(route.every((point) => point.lat > 21.0302 || point.lng > 105.823));
+
+  const tripLine = routeForStatus("InProgress", approach, {
+    type: "LineString",
+    coordinates: approach.coordinates,
+  }, [], bike);
+  assert.ok(tripLine[0].lng > 105.8204);
+  assert.deepEqual(remainingLine(routeForStatus("Accepted", approach, trip, []), { lat: 21.05, lng: 105.9 }).at(0), {
+    lng: 105.82,
+    lat: 21.03,
+  });
 });
 
 test("a started ride keeps the rider on the bike", () => {
