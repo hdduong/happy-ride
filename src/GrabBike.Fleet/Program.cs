@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using GrabBike.Api.Features.Drivers;
+using GrabBike.Api.Features.Maps;
 using GrabBike.Api.Features.Realtime;
 using GrabBike.Api.Infrastructure;
 
@@ -18,9 +19,15 @@ public static class Program
         builder.Services.AddFleetServices(builder.Configuration, startWorker: true);
         var realtimeUrl = builder.Configuration["Services:Realtime"];
         if (!string.IsNullOrWhiteSpace(realtimeUrl))
+        {
             builder.Services.AddRemoteRealtime(realtimeUrl);
+            builder.Services.AddRemoteMapConfig(realtimeUrl);
+        }
         else
+        {
             builder.Services.AddSingleton<IRideEventPublisher, NoRideEventPublisher>();
+            builder.Services.AddSingleton<IMapConfigPublisher, NoMapConfigPublisher>();
+        }
 
         var app = builder.Build();
         await app.PrepareDatabaseAsync(connectionString);
