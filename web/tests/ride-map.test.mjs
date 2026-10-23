@@ -38,10 +38,9 @@ test("the line starts at the bike after the spur behind it has been passed", () 
     coordinates: approach.coordinates,
   }, [], bike);
   assert.ok(tripLine[0].lng > 105.8204);
-  assert.deepEqual(remainingLine(routeForStatus("Accepted", approach, trip, []), { lat: 21.05, lng: 105.9 }).at(0), {
-    lng: 105.82,
-    lat: 21.03,
-  });
+  const away = remainingLine(routeForStatus("Accepted", approach, trip, []), { lat: 21.05, lng: 105.9 });
+  assert.ok(away[0].lng > 105.8204, "a sample off the road restores the spur behind the bike");
+  assert.equal(away.at(-1).lng, 105.826);
 });
 
 test("a nearby later leg does not erase the road still ahead", () => {
@@ -83,6 +82,53 @@ test("a second booking of the same road starts the line at the new bike", () => 
   assert.ok(restart[0].lng > 105.8404);
   assert.ok(restart[0].lng < 105.842);
   assert.equal(restart.at(-1).lng, 105.846);
+});
+
+test("a location off the road keeps the last trimmed line", () => {
+  const line = [
+    { lng: 105.9, lat: 21.03 },
+    { lng: 105.91, lat: 21.03 },
+  ];
+  const trimmed = remainingLine(line, { lng: 105.905, lat: 21.03 });
+  assert.ok(trimmed[0].lng > 105.904);
+  assert.ok(trimmed[0].lng < 105.906);
+  const offRoad = remainingLine(line, { lng: 105.905, lat: 21.032 });
+  assert.ok(Math.abs(offRoad[0].lng - trimmed[0].lng) < 0.00002);
+  assert.equal(offRoad.at(-1).lng, 105.91);
+  const jumpedBack = remainingLine(line, { lng: trimmed[0].lng - 0.0004, lat: 21.03 });
+  assert.ok(Math.abs(jumpedBack[0].lng - trimmed[0].lng) < 0.00002);
+});
+
+test("backward jitter does not redraw the road already passed", () => {
+  const line = [
+    { lng: 105.93, lat: 21.04 },
+    { lng: 105.94, lat: 21.04 },
+  ];
+  const forward = remainingLine(line, { lng: 105.935, lat: 21.04 });
+  const jitter = remainingLine(line, { lng: forward[0].lng - 0.00009, lat: 21.04 });
+  assert.ok(jitter[0].lng >= forward[0].lng - 0.00001);
+  assert.equal(jitter.at(-1).lng, 105.94);
+  const further = remainingLine(line, { lng: 105.937, lat: 21.04 });
+  assert.ok(further[0].lng > jitter[0].lng);
+});
+
+test("a far sample after arrival does not restore the finished route", () => {
+  const line = [
+    { lng: 105.95, lat: 21.02 },
+    { lng: 105.956, lat: 21.02 },
+  ];
+  assert.deepEqual(remainingLine(line, { lng: 105.956, lat: 21.02 }), []);
+  assert.deepEqual(remainingLine(line, { lng: 105.956, lat: 21.022 }), []);
+});
+
+test("an unmatched bike still shows the whole road", () => {
+  const line = [
+    { lng: 105.96, lat: 21.01 },
+    { lng: 105.97, lat: 21.01 },
+  ];
+  const shown = remainingLine(line, { lng: 105.965, lat: 21.012 });
+  assert.equal(shown[0].lng, 105.96);
+  assert.equal(shown.at(-1).lng, 105.97);
 });
 
 test("a started ride keeps the rider on the bike", () => {
