@@ -44,6 +44,22 @@ test("the line starts at the bike after the spur behind it has been passed", () 
   });
 });
 
+test("reaching the destination removes the last driven segment", () => {
+  const line = [
+    { lng: 105.82, lat: 21.03 },
+    { lng: 105.826, lat: 21.028 },
+  ];
+  assert.deepEqual(remainingLine(line, { lng: 105.826, lat: 21.028 }), []);
+  const underway = remainingLine(line, { lng: 105.823, lat: 21.029 });
+  assert.ok(underway.length >= 2);
+  assert.ok(underway[0].lng > 105.822);
+  assert.equal(underway.at(-1).lng, 105.826);
+  assert.deepEqual(routeForStatus("DroppedOff", null, {
+    type: "LineString",
+    coordinates: [[105.82, 21.03], [105.826, 21.028]],
+  }, line, { lng: 105.826, lat: 21.028 }), []);
+});
+
 test("a started ride keeps the rider on the bike", () => {
   const pickup = { lat: 21.03, lng: 105.82 };
   const driver = { lat: 21.036, lng: 105.831 };

@@ -87,8 +87,8 @@ export function remainingLine(points: LatLng[], current: LatLng, maxDistanceM = 
   }
   if (best > maxDistanceM) return points;
   const ahead = points.slice(index + 1);
-  if (ahead.length === 0) return points.slice(index);
-  if (haversineMeters(snap, ahead[0]) < 1) return ahead.length >= 2 ? ahead : [points[index], ahead[0]];
+  if (ahead.length === 0) return [];
+  if (haversineMeters(snap, ahead[0]) < 1) return ahead.length >= 2 ? ahead : [];
   return [snap, ...ahead];
 }
 
