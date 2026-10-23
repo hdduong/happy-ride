@@ -140,10 +140,12 @@ function CityPeople({
 async function openAtHome(user: DevUser, choice: { ticket: number }) {
   const ticket = takePersonaChoice(choice);
   rememberPersona(user.id, user.city);
-  try {
-    await returnHome(user.id);
-  } catch {
-    // The screen still opens at the last saved place if the reset cannot be saved.
+  if (isDriverRole(user.role)) {
+    try {
+      await returnHome(user.id);
+    } catch {
+      // The driver screen still opens at the last saved place if the reset cannot be saved.
+    }
   }
   return isCurrentPersonaChoice(ticket, choice);
 }

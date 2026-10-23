@@ -5,7 +5,7 @@ import { autocomplete, createQuote, getPlace } from "@/features/maps/api";
 import { cancelRide, confirmArrival, createRide, getRide } from "@/features/rides/api";
 import { getUsers } from "@/features/identity/api";
 import { rememberPersona, storedPersona } from "@/features/identity/storage";
-import { pickupForPersona } from "@/features/maps/geo";
+import { finishedPlace, pickupForPersona } from "@/features/maps/geo";
 import { useRideSession } from "@/features/rides/useRideSession";
 import { messageFrom } from "@/shared/api/client";
 import type { Place, Quote } from "@/features/maps/types";
@@ -29,6 +29,8 @@ export function useRiderBooking(userId: string) {
   const [cityAttempt, setCityAttempt] = useState(0);
   const searchSeq = useRef(0);
   const { ride, live, session } = useRideSession(userId, "rider");
+  const rideRef = useRef(ride);
+  rideRef.current = ride;
   const allowSearch = !ride && homeReady;
   const pickup = manualPickup ?? home;
   const searchText = editingPickup ? pickupQuery : query;
@@ -37,7 +39,7 @@ export function useRiderBooking(userId: string) {
     let cancel = false;
     const cached = storedPersona();
     if (cached?.id === userId) {
-      setHome(pickupForPersona(userId, cached.city));
+      setHome(finishedPlace(rideRef.current) ?? pickupForPersona(userId, cached.city));
       setHomeReady(true);
     }
     getUsers(userId)
@@ -46,7 +48,7 @@ export function useRiderBooking(userId: string) {
         const person = users.find((user) => user.id === userId);
         if (!person) return;
         rememberPersona(person.id, person.city);
-        setHome(pickupForPersona(person.id, person.city));
+        setHome(finishedPlace(rideRef.current) ?? pickupForPersona(person.id, person.city));
         setCityError(null);
         setHomeReady(true);
       })
@@ -57,6 +59,11 @@ export function useRiderBooking(userId: string) {
       cancel = true;
     };
   }, [homeReady, userId, cityAttempt]);
+
+  useEffect(() => {
+    const place = finishedPlace(ride);
+    if (place) setHome(place);
+  }, [ride]);
 
   useEffect(() => {
     if (!ride) return;
@@ -199,6 +206,8 @@ export function useRiderBooking(userId: string) {
   }
 
   function resetToSearch() {
+    const place = finishedPlace(ride);
+    if (place) setHome(place);
     session.dismissRide();
     setQuote(null);
     setDestination(null);

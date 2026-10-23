@@ -72,6 +72,19 @@ export function riderPosition(status: string | undefined, pickup: LatLng, driver
   return pickup;
 }
 
+export function finishedPlace(
+  ride: { status: string; dropoff: LatLng & { address?: string } } | null | undefined,
+) {
+  if (ride?.status !== "Completed" || !isPlotted(ride.dropoff)) return null;
+  const address = ride.dropoff.address?.trim() || "Current location";
+  return { name: address, address, lat: ride.dropoff.lat, lng: ride.dropoff.lng };
+}
+
+export function mapAtFinishedPlace(dropoff: LatLng & { address: string }) {
+  const here = { lat: dropoff.lat, lng: dropoff.lng, address: dropoff.address };
+  return { pickup: here, route: [] as LatLng[], markers: [{ ...here, kind: "pickup" as const }] };
+}
+
 export function linePoints(route: GeoLine | null | undefined): LatLng[] {
   if (!route) return [];
   return route.coordinates

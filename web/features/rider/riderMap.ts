@@ -1,8 +1,11 @@
-import { bearing, isPlotted, riderPosition, routeForStatus } from "@/features/maps/geo";
+import { bearing, isPlotted, mapAtFinishedPlace, riderPosition, routeForStatus } from "@/features/maps/geo";
 import type { MapMarker } from "@/features/maps/MapCanvas";
 import type { RiderBooking } from "./useRiderBooking";
 
 export function riderMap({ ride, live, pickup: selected, destination, quote }: Pick<RiderBooking, "ride" | "live" | "pickup" | "destination" | "quote">) {
+  if (ride?.status === "Completed" && isPlotted(ride.dropoff)) {
+    return { ...mapAtFinishedPlace(ride.dropoff), driverLive: null };
+  }
   const pickup = ride?.pickup ?? {
     lat: selected.lat,
     lng: selected.lng,
