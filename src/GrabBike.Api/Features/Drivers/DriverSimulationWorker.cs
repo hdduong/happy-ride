@@ -8,7 +8,7 @@ public sealed class DriverSimulationWorker(
     IRideNotifications notifications,
     ILogger<DriverSimulationWorker> logger) : BackgroundService
 {
-    public const double StepMeters = 40;
+    public const double StepMeters = 80;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
