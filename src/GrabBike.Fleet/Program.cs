@@ -20,8 +20,9 @@ public static class Program
         var realtimeUrl = builder.Configuration["Services:Realtime"];
         if (!string.IsNullOrWhiteSpace(realtimeUrl))
         {
-            builder.Services.AddRemoteRealtime(realtimeUrl);
-            builder.Services.AddRemoteMapConfig(realtimeUrl);
+            var internalKey = builder.Configuration["Internal:Key"];
+            builder.Services.AddRemoteRealtime(realtimeUrl, internalKey);
+            builder.Services.AddRemoteMapConfig(realtimeUrl, internalKey);
         }
         else
         {

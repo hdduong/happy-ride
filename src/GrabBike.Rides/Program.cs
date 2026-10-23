@@ -19,8 +19,9 @@ public static class Program
         var realtimeUrl = builder.Configuration["Services:Realtime"]
             ?? throw new InvalidOperationException("Services:Realtime is required for the rides service.");
         builder.Services.AddRideServices();
-        builder.Services.AddRemoteDispatch(dispatchUrl);
-        builder.Services.AddRemoteRealtime(realtimeUrl);
+        var internalKey = builder.Configuration["Internal:Key"];
+        builder.Services.AddRemoteDispatch(dispatchUrl, internalKey);
+        builder.Services.AddRemoteRealtime(realtimeUrl, internalKey);
 
         var app = builder.Build();
         await app.PrepareDatabaseAsync(connectionString);

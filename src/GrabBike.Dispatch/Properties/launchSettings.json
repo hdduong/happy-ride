@@ -6,6 +6,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "Internal__Enabled": "true",
+        "Internal__Key": "happy-ride-local",
         "Services__Realtime": "http://localhost:5084"
       }
     }

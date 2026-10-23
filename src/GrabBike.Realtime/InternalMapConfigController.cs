@@ -1,4 +1,5 @@
 using GrabBike.Api.Features.Maps;
+using GrabBike.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GrabBike.Api.Features.Realtime;
@@ -11,8 +12,10 @@ public sealed class InternalMapConfigController(IMapConfigPublisher publisher, I
     [HttpPost]
     public async Task<IActionResult> Post(MapConfiguration configurationChange, CancellationToken cancellationToken)
     {
-        if (!configuration.GetValue("Internal:Enabled", false))
+        if (!InternalAccess.Enabled(configuration))
             return NotFound();
+        if (!InternalAccess.Authorized(Request, configuration))
+            return Unauthorized();
         await publisher.ChangedAsync(configurationChange, cancellationToken);
         return NoContent();
     }

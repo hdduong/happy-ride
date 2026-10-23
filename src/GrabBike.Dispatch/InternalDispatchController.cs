@@ -1,4 +1,5 @@
 using GrabBike.Api.Features.Realtime;
+using GrabBike.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GrabBike.Api.Features.Dispatch;
@@ -11,8 +12,10 @@ public sealed class InternalDispatchController(IDispatchBus bus, IConfiguration 
     [HttpPost]
     public async Task<ActionResult<IReadOnlyList<OutboundEvent>>> Post(DispatchMessage message, CancellationToken cancellationToken)
     {
-        if (!configuration.GetValue("Internal:Enabled", false))
+        if (!InternalAccess.Enabled(configuration))
             return NotFound();
+        if (!InternalAccess.Authorized(Request, configuration))
+            return Unauthorized();
         return Ok(await bus.PublishAsync(message, cancellationToken));
     }
 }

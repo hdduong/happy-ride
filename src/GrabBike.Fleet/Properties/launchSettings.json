@@ -5,7 +5,8 @@
       "applicationUrl": "http://localhost:5083",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Services__Realtime": "http://localhost:5084"
+        "Services__Realtime": "http://localhost:5084",
+        "Internal__Key": "happy-ride-local"
       }
     }
   }

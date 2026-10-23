@@ -18,7 +18,7 @@ public static class Program
         builder.Services.AddDispatchServices(builder.Configuration, startWorker: true);
         var realtimeUrl = builder.Configuration["Services:Realtime"];
         if (!string.IsNullOrWhiteSpace(realtimeUrl))
-            builder.Services.AddRemoteRealtime(realtimeUrl);
+            builder.Services.AddRemoteRealtime(realtimeUrl, builder.Configuration["Internal:Key"]);
         else
             builder.Services.AddSingleton<IRideEventPublisher, NoRideEventPublisher>();
 
