@@ -390,7 +390,7 @@ public sealed class BusinessLoggingTests(PostgresFixture postgres)
                 return events;
             });
             fixture.Rides = new RideService(new QuoteRepository(fixture._db), rides, offers, drivers, bus,
-                fixture.UnitOfWork, writeLock, pickupRoutes, fixture.Logs.Logger<RideService>());
+                fixture.UnitOfWork, writeLock, pickupRoutes, new DriverRoam(), fixture.Logs.Logger<RideService>());
             fixture.Offers = new OfferService(offers, rides, drivers, dispatch, bus, fixture.UnitOfWork, writeLock,
                 new StraightPickupRouter(), pickupRoutes, fixture.Logs.Logger<OfferService>());
             fixture.Expiry = new DispatchExpiryService(offers, rides, dispatch, fixture.UnitOfWork, writeLock,

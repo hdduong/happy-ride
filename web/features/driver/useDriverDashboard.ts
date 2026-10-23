@@ -16,21 +16,29 @@ export function useDriverDashboard(userId: string) {
   const [center, setCenter] = useState({ lat: DEFAULT_PICKUP.lat, lng: DEFAULT_PICKUP.lng });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const riding = Boolean(ride);
   useEffect(() => {
     let cancel = false;
-    getUsers(userId)
-      .then((users) => {
-        if (cancel) return;
-        const person = users.find((user) => user.id === userId) ?? null;
-        setMe(person);
-        if (person?.lat != null && person.lng != null) setCenter({ lat: person.lat, lng: person.lng });
-        else if (person) setCenter(centerForCity(person.city));
-      })
-      .catch(() => undefined);
+    const load = () => {
+      void getUsers(userId)
+        .then((users) => {
+          if (cancel) return;
+          const person = users.find((user) => user.id === userId) ?? null;
+          setMe(person);
+          if (riding) return;
+          if (person?.lat != null && person.lng != null) setCenter({ lat: person.lat, lng: person.lng });
+          else if (person) setCenter(centerForCity(person.city));
+        })
+        .catch(() => undefined);
+    };
+    load();
+    if (riding) return () => { cancel = true; };
+    const timer = window.setInterval(load, 2000);
     return () => {
       cancel = true;
+      window.clearInterval(timer);
     };
-  }, [userId]);
+  }, [userId, riding]);
 
   async function onAccept(offer: Offer) {
     setBusy(true);
