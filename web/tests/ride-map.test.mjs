@@ -142,11 +142,11 @@ test("an unmatched bike still shows the whole road", () => {
   assert.equal(shown.at(-1).lng, 105.97);
 });
 
-test("a started ride keeps the rider on the bike", () => {
+test("the rider stays at the pickup while the driver moves", () => {
   const pickup = { lat: 21.03, lng: 105.82 };
   const driver = { lat: 21.036, lng: 105.831 };
-  assert.deepEqual(riderPosition("InProgress", pickup, driver), driver);
-  assert.deepEqual(riderPosition("DroppedOff", pickup, driver), driver);
+  assert.deepEqual(riderPosition("InProgress", pickup, driver), pickup);
+  assert.deepEqual(riderPosition("DroppedOff", pickup, driver), pickup);
   assert.deepEqual(riderPosition("Accepted", pickup, driver), pickup);
 });
 

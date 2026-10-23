@@ -43,20 +43,9 @@ public sealed class DriverSimulationService(
                 if (moved.MovedM >= 0.5)
                     events.Add(LocationEvent(ride, driver, now));
             }
-            else
+            else if (driver.CurrentRideId is Guid finishedRideId)
             {
-                if (driver.CurrentRideId is Guid finishedRideId)
-                    pickupRoutes.Forget(finishedRideId);
-            }
-
-            if (ride.Status == RideStatus.InProgress)
-            {
-                var moved = Geo.AdvanceRoute(ride.Route.Coordinates, ride.SegmentIndex, ride.SegmentOffsetM, stepMeters);
-                ride.SegmentIndex = moved.Segment;
-                ride.SegmentOffsetM = moved.OffsetM;
-                ApplyMovement(driver, moved.Lat, moved.Lng, moved.Heading, moved.MovedM);
-                if (moved.MovedM >= 0.5)
-                    events.Add(LocationEvent(ride, driver, now));
+                pickupRoutes.Forget(finishedRideId);
             }
         }
 
