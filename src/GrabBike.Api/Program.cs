@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json.Serialization;
 using GrabBike.Api.Features.Dev;
 using GrabBike.Api.Features.Dispatch;
@@ -8,21 +9,52 @@ using GrabBike.Api.Features.Rides;
 using GrabBike.Api.Features.Telemetry;
 using GrabBike.Api.Infrastructure;
 using GrabBike.Api.Infrastructure.Auth;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using Yarp.ReverseProxy;
+using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.Forwarder;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.AddHappyRideCore();
-builder.Services.AddControllers()
-    .AddApplicationPart(typeof(RidesController).Assembly)
-    .AddApplicationPart(typeof(OffersController).Assembly)
-    .AddApplicationPart(typeof(MapsController).Assembly)
+var ridesUrl = builder.Configuration["Services:Rides"];
+var dispatchUrl = builder.Configuration["Services:Dispatch"];
+var fleetUrl = builder.Configuration["Services:Fleet"];
+var realtimeUrl = builder.Configuration["Services:Realtime"];
+var split = !string.IsNullOrWhiteSpace(ridesUrl)
+    && !string.IsNullOrWhiteSpace(dispatchUrl)
+    && !string.IsNullOrWhiteSpace(fleetUrl)
+    && !string.IsNullOrWhiteSpace(realtimeUrl);
+var controllers = builder.Services.AddControllers()
     .AddApplicationPart(typeof(UserController).Assembly)
-    .AddApplicationPart(typeof(ActivityController).Assembly)
-    .AddJsonOptions(options =>
+    .AddApplicationPart(typeof(ActivityController).Assembly);
+if (!split)
+{
+    controllers
+        .AddApplicationPart(typeof(RidesController).Assembly)
+        .AddApplicationPart(typeof(OffersController).Assembly)
+        .AddApplicationPart(typeof(MapsController).Assembly);
+}
+if (split)
+{
+    controllers.ConfigureApplicationPartManager(manager =>
     {
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        var featureAssemblies = new[]
+        {
+            typeof(RidesController).Assembly,
+            typeof(OffersController).Assembly,
+            typeof(MapsController).Assembly,
+            typeof(RideHub).Assembly,
+        };
+        foreach (var part in manager.ApplicationParts.OfType<AssemblyPart>().Where(part => featureAssemblies.Contains(part.Assembly)).ToList())
+            manager.ApplicationParts.Remove(part);
     });
+}
+controllers.AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 builder.Services.AddEndpointsApiExplorer();
 var entraConfigured = EntraApiAuthentication.IsConfigured(builder.Configuration);
 builder.Services.AddSwaggerGen(options =>
@@ -65,10 +97,36 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-builder.Services.AddRideServices();
-builder.Services.AddDispatchServices(builder.Configuration, startWorker: true);
-builder.Services.AddFleetServices(builder.Configuration, startWorker: true);
-builder.Services.AddRealtimeServices();
+if (split)
+{
+    builder.Services.AddSingleton<IRideEventPublisher, NoRideEventPublisher>();
+    builder.Services.AddReverseProxy().LoadFromMemory(
+        [
+            ServiceRoute("rides", "rides", "/api/rides", 0),
+            ServiceRoute("rides-rest", "rides", "/api/rides/{**catch-all}", 1),
+            ServiceRoute("offers", "dispatch", "/api/offers", 0),
+            ServiceRoute("offers-rest", "dispatch", "/api/offers/{**catch-all}", 1),
+            ServiceRoute("map-config", "fleet", "/api/map-config", 0),
+            ServiceRoute("places", "fleet", "/api/places/{**catch-all}", 1),
+            ServiceRoute("geocode", "fleet", "/api/geocode/{**catch-all}", 1),
+            ServiceRoute("quotes", "fleet", "/api/quotes", 0),
+            ServiceRoute("map-provider", "fleet", "/api/dev/map-provider", 0),
+            ServiceRoute("hub", "realtime", "/hubs/{**catch-all}", 1),
+        ],
+        [
+            ServiceCluster("rides", ridesUrl!),
+            ServiceCluster("dispatch", dispatchUrl!),
+            ServiceCluster("fleet", fleetUrl!),
+            ServiceCluster("realtime", realtimeUrl!, TimeSpan.FromMinutes(2)),
+        ]);
+}
+else
+{
+    builder.Services.AddRideServices();
+    builder.Services.AddDispatchServices(builder.Configuration, startWorker: true);
+    builder.Services.AddFleetServices(builder.Configuration, startWorker: true);
+    builder.Services.AddRealtimeServices();
+}
 
 var app = builder.Build();
 await app.PrepareDatabaseAsync(connectionString);
@@ -83,8 +141,34 @@ app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescripti
 app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
 
 app.UseHappyRidePipeline();
-app.MapHub<RideHub>("/hubs/ride");
+if (split)
+    app.MapReverseProxy();
+else
+    app.MapHub<RideHub>("/hubs/ride");
 app.MapControllers();
 app.Run();
+
+static RouteConfig ServiceRoute(string id, string cluster, string path, int order) => new()
+{
+    RouteId = id,
+    ClusterId = cluster,
+    Order = order,
+    Match = new RouteMatch { Path = path },
+};
+
+static ClusterConfig ServiceCluster(string id, string address, TimeSpan? activityTimeout = null) => new()
+{
+    ClusterId = id,
+    Destinations = new Dictionary<string, DestinationConfig>
+    {
+        [id] = new() { Address = address.TrimEnd('/') + "/" },
+    },
+    HttpRequest = new ForwarderRequestConfig
+    {
+        Version = HttpVersion.Version11,
+        VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+        ActivityTimeout = activityTimeout ?? TimeSpan.FromSeconds(100),
+    },
+};
 
 public partial class Program;

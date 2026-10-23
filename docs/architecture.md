@@ -15,7 +15,7 @@ src/GrabBike.Realtime/   SignalR hub. Port 5084.
 src/GrabBike.Shared/     contracts, identity, telemetry, and the shared database.
 ```
 
-`dotnet run --project src/GrabBike.Api` still serves the whole API at http://localhost:5080. Run the four service projects instead when each process should own its own port. Those processes need `Services:Dispatch` and `Services:Realtime` so ride commands and live events cross the process boundary. Production publish still starts `GrabBike.Api`, which keeps the services in one process until each service is deployed on its own.
+`dotnet run --project src/GrabBike.Api` serves the whole API at http://localhost:5080 in one process. To run four processes and keep the browser on that same address, start Rides, Dispatch, Fleet, and Realtime, then start the API with the `split` profile. That edge forwards `/api/rides`, `/api/offers`, map routes, and `/hubs/ride` to the owning service. Dev users and telemetry stay on the edge, which is the one origin the web app already uses. Production publish starts `GrabBike.Api` with no service URLs, so Azure stays one process.
 
 Each feature keeps its models, contracts, application services, and repository interfaces together. A controller is the HTTP adapter for a feature: it validates transport input and maps application outcomes to status codes and JSON. Application services own use cases and depend on repository interfaces; they do not choose HTTP statuses or access the EF context directly.
 
@@ -25,7 +25,7 @@ Driver movement and dispatch expiration have separate services and background wo
 
 State is saved before realtime notifications are sent. Notification delivery is best effort: a delivery failure is logged and does not change a successful, committed HTTP command into an error. Clients poll to reconcile current ride and offer state. This is not durable event delivery; reliable replay would require an outbox or another persistent mechanism.
 
-The SQLite demo serializes writes with a process-local lock. This supports the existing single-process tests, including concurrent offer acceptance. Multiple API instances require database-level concurrency controls and coordination; moving files into features does not provide those guarantees.
+Ride writes take one Postgres advisory lock, so separate service processes cannot accept and cancel the same ride at the same time. Database creation and seeding use that same lock.
 
 The HTTP boundary records request outcomes and handles unexpected exceptions centrally. Feature services add structured ride/offer identifiers to business logs; they do not depend on an Azure telemetry SDK. JSON console output is always available, and Azure Monitor export is enabled only when the API has `APPLICATIONINSIGHTS_CONNECTION_STRING`. The existing manual deployment applies an optional GitHub connection-string secret, or creates/reuses the monitoring resources and reads the connection string from Azure when no secret is supplied. See [observability](observability.md) for activation, queries, collection limits, and retention behavior.
 
@@ -71,4 +71,4 @@ The checks are the API integration suite (`dotnet test`), frontend state/lifecyc
 
 ## Remaining target work
 
-The demo still uses development identity, SQLite, fake map data, and simulated positions. PostgreSQL/PostGIS, durable Azure Service Bus dispatch, real map providers, and device location ingestion remain work described by the build plan. The feature structure provides places to implement these; the refactor does not claim they are already implemented.
+The demo still uses development identity, fake map data unless a provider key is configured, and simulated positions. The services share one Postgres database. Durable Azure Service Bus dispatch, real device location, and a production deployment of each service on its own remain work described by the build plan. The feature structure provides places to implement these; the refactor does not claim they are already implemented.

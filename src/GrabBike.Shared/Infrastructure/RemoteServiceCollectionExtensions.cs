@@ -27,6 +27,7 @@ public static class RemoteServiceCollectionExtensions
     private static void Configure(HttpClient client, string url, string? internalKey)
     {
         client.BaseAddress = new Uri(url);
+        client.Timeout = TimeSpan.FromSeconds(3);
         if (!string.IsNullOrWhiteSpace(internalKey))
             client.DefaultRequestHeaders.TryAddWithoutValidation(InternalAccess.Header, internalKey);
     }

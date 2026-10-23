@@ -5,6 +5,7 @@
       "applicationUrl": "http://localhost:5081",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__GrabBike": "Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride",
         "Services__Dispatch": "http://localhost:5082",
         "Services__Realtime": "http://localhost:5084",
         "Internal__Key": "happy-ride-local"

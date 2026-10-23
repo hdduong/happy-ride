@@ -72,7 +72,9 @@ public static class HappyRideHost
 
     public static async Task PrepareDatabaseAsync(this WebApplication app, string connectionString)
     {
-        await using var startup = await app.Services.GetRequiredService<IRideWriteLock>().AcquireAsync();
+        // Schema setup uses its own connection. A test can replace IRideWriteLock to order ride commands,
+        // and that replacement must not run during startup or the host never finishes booting.
+        await using var startup = await new RideWriteLock(connectionString).AcquireAsync();
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await using (var connection = new NpgsqlConnection(connectionString))

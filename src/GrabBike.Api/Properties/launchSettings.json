@@ -9,6 +9,17 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "split": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:5080",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Services__Rides": "http://localhost:5081",
+        "Services__Dispatch": "http://localhost:5082",
+        "Services__Fleet": "http://localhost:5083",
+        "Services__Realtime": "http://localhost:5084"
+      }
     }
   }
 }
