@@ -72,6 +72,7 @@ public static class HappyRideHost
 
     public static async Task PrepareDatabaseAsync(this WebApplication app, string connectionString)
     {
+        await using var startup = await app.Services.GetRequiredService<IRideWriteLock>().AcquireAsync();
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await using (var connection = new NpgsqlConnection(connectionString))
@@ -81,6 +82,7 @@ public static class HappyRideHost
             await command.ExecuteNonQueryAsync();
         }
         await db.Database.EnsureCreatedAsync();
+        await db.Database.ExecuteSqlRawAsync("""ALTER TABLE "Rides" ADD COLUMN IF NOT EXISTS "ApproachRoute" text""");
         await DatabaseSeeder.SeedAsync(db);
     }
 

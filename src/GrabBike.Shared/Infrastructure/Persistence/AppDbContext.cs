@@ -70,6 +70,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(ride => ride.Route).HasConversion(
                 route => JsonSerializer.Serialize(route, RouteJson),
                 json => JsonSerializer.Deserialize<GeoRoute>(json, RouteJson) ?? EmptyRoute);
+            entity.Property(ride => ride.ApproachRoute).HasConversion(
+                route => route == null ? null : JsonSerializer.Serialize(route, RouteJson),
+                json => string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<GeoRoute>(json, RouteJson));
             entity.HasIndex(ride => ride.RiderId);
         });
 

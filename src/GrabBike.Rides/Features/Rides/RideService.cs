@@ -32,45 +32,48 @@ public sealed class RideService(
 {
     public async Task<RideOutcome> CreateAsync(Guid riderId, Guid quoteId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        await using var _ = await writeLock.AcquireAsync(cancellationToken);
-        var quote = await quotes.FindAsync(quoteId, cancellationToken);
-        if (quote is null)
-            return new RideOutcome.NotFound();
-
-        var active = await rides.FindActiveForRiderAsync(riderId, cancellationToken);
-        if (active is not null)
-            return new RideOutcome.ActiveRideConflict(active.Id);
-
-        var ride = new Ride
+        RideOutcome.Created result;
+        await using (await writeLock.AcquireAsync(cancellationToken))
         {
-            Id = Guid.NewGuid(),
-            RiderId = riderId,
-            QuoteId = quote.Id,
-            Status = RideStatus.Searching,
-            Pickup = quote.Pickup,
-            Dropoff = quote.Dropoff,
-            DistanceM = quote.DistanceM,
-            DurationS = quote.DurationS,
-            FareVnd = quote.FareVnd,
-            Route = quote.Route,
-            Round = 1,
-            CreatedAt = now.UtcTicks,
-        };
-        await rides.AddAsync(ride, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+            var quote = await quotes.FindAsync(quoteId, cancellationToken);
+            if (quote is null)
+                return new RideOutcome.NotFound();
 
-        var result = new RideOutcome.Created(new CreatedRideDto(ride.Id));
+            var active = await rides.FindActiveForRiderAsync(riderId, cancellationToken);
+            if (active is not null)
+                return new RideOutcome.ActiveRideConflict(active.Id);
+
+            var ride = new Ride
+            {
+                Id = Guid.NewGuid(),
+                RiderId = riderId,
+                QuoteId = quote.Id,
+                Status = RideStatus.Searching,
+                Pickup = quote.Pickup,
+                Dropoff = quote.Dropoff,
+                DistanceM = quote.DistanceM,
+                DurationS = quote.DurationS,
+                FareVnd = quote.FareVnd,
+                Route = quote.Route,
+                Round = 1,
+                CreatedAt = now.UtcTicks,
+            };
+            await rides.AddAsync(ride, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            result = new RideOutcome.Created(new CreatedRideDto(ride.Id));
+        }
+
         try
         {
-            var dispatched = await dispatchBus.PublishAsync(new DispatchMessage.Requested(ride.Id, ride.Round), cancellationToken);
+            var dispatched = await dispatchBus.PublishAsync(new DispatchMessage.Requested(result.Body.RideId, 1), cancellationToken);
             result.Events.AddRange(dispatched);
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Ride {RideId} was saved but dispatch was not published", ride.Id);
+            logger.LogWarning(exception, "Ride {RideId} was saved but dispatch was not published", result.Body.RideId);
         }
         logger.LogInformation(new EventId(2000, "RideBooked"),
-            "Ride {RideId} booked with status {Status}", ride.Id, ride.Status.ToString());
+            "Ride {RideId} booked with status {Status}", result.Body.RideId, RideStatus.Searching.ToString());
         DispatchLogging.Committed(logger, result.Events);
         return result;
     }
@@ -257,7 +260,7 @@ public sealed class RideService(
         Driver? driver = null;
         if (ride.DriverId is Guid driverId)
             driver = await drivers.FindAsync(driverId, cancellationToken);
-        return RideMaps.ToView(ride, driver, pickupRoutes.Geometry(ride.Id));
+        return RideMaps.ToView(ride, driver, pickupRoutes.Geometry(ride.Id) ?? ride.ApproachRoute);
     }
 
     private static bool IsActive(RideStatus status) => status is

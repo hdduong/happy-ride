@@ -74,7 +74,10 @@ public sealed class OfferService(
         driver.SpeedKmh = 0;
         offer.Status = OfferStatus.Accepted;
         if (approach is not null)
+        {
             pickupRoutes.Start(ride.Id, approach);
+            ride.ApproachRoute = approach;
+        }
 
         var view = RideMaps.ToView(ride, driver, pickupRoutes.Geometry(ride.Id));
         var result = new OfferOutcome.Accepted(view);
@@ -111,24 +114,33 @@ public sealed class OfferService(
 
     public async Task<OfferOutcome> DeclineAsync(Guid driverId, Guid offerId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        await using var _ = await writeLock.AcquireAsync(cancellationToken);
-        var offer = await offers.FindAsync(offerId, cancellationToken);
-        if (offer is null)
-            return new OfferOutcome.NotFound();
-        if (offer.DriverId != driverId)
-            return new OfferOutcome.Forbidden();
-
-        var result = new OfferOutcome.Declined();
-        var changed = offer.Status == OfferStatus.Pending;
-        if (changed)
+        OfferOutcome result;
+        var changed = false;
+        Guid declinedOfferId;
+        Guid declinedRideId;
+        await using (await writeLock.AcquireAsync(cancellationToken))
         {
-            offer.Status = OfferStatus.Declined;
-            var ride = await rides.FindAsync(offer.RideId, cancellationToken);
-            if (ride is not null)
-                await dispatch.AdvanceAsync(ride, now, result.Events, cancellationToken);
+            var offer = await offers.FindAsync(offerId, cancellationToken);
+            if (offer is null)
+                return new OfferOutcome.NotFound();
+            if (offer.DriverId != driverId)
+                return new OfferOutcome.Forbidden();
+
+            result = new OfferOutcome.Declined();
+            changed = offer.Status == OfferStatus.Pending;
+            declinedOfferId = offer.Id;
+            declinedRideId = offer.RideId;
+            if (changed)
+            {
+                offer.Status = OfferStatus.Declined;
+                var ride = await rides.FindAsync(offer.RideId, cancellationToken);
+                if (ride is not null)
+                    await dispatch.AdvanceAsync(ride, now, result.Events, cancellationToken);
+            }
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
         foreach (var created in result.Events.OfType<OutboundEvent.OfferReceived>().Select(item => item.Offer).DistinctBy(item => (item.RideId, item.Round)))
         {
             try
@@ -144,7 +156,7 @@ public sealed class OfferService(
         {
             logger.LogInformation(new EventId(2101, "OfferDeclined"),
                 "Offer {OfferId} declined for ride {RideId} by driver {DriverId}",
-                offer.Id, offer.RideId, driverId);
+                declinedOfferId, declinedRideId, driverId);
             DispatchLogging.Committed(logger, result.Events);
         }
         return result;

@@ -27,6 +27,7 @@ public sealed class Ride
     public required int DurationS { get; init; }
     public required int FareVnd { get; init; }
     public required GeoRoute Route { get; set; }
+    public GeoRoute? ApproachRoute { get; set; }
     public int Round { get; set; } = 1;
     public long CreatedAt { get; set; }
     public int SegmentIndex { get; set; }
