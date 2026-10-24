@@ -1,10 +1,10 @@
-# Project context — GrabBike clone capstone
+# Project context — Happy Ride capstone
 
 Stable goals, constraints, and decisions. Progress lives in `notes.md`; the build plan in `build-plan.md`; the source brief is `vietnam-bike-rideshare-design.pdf`.
 
 ## Goal
 
-A working motorbike ride-hailing MVP (GrabBike clone, Vietnam) that demos end to end, built as a capstone project.
+A working motorbike ride-hailing MVP (Happy Ride, Vietnam) that demos end to end, built as a capstone project.
 
 ## Constraints
 

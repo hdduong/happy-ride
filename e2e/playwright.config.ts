@@ -27,11 +27,12 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `dotnet run --project ../src/GrabBike.Api --no-launch-profile --urls ${apiUrl}`,
+      command: `dotnet run --project ../src/HappyRide.Api --no-launch-profile --urls ${apiUrl}`,
       url: `${apiUrl}/api/map-config`,
       env: {
         Cors__AllowedOrigins: webUrl,
-        ConnectionStrings__GrabBike: process.env.ConnectionStrings__GrabBike
+        ConnectionStrings__HappyRide: process.env.ConnectionStrings__HappyRide
+          ?? process.env.ConnectionStrings__GrabBike
           ?? 'Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride',
         'Dispatch__Bus': 'InMemory',
         'Maps__Provider': process.env.E2E_MAPS_PROVIDER ?? 'Fake',
