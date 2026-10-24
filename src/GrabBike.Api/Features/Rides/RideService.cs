@@ -27,7 +27,6 @@ public sealed class RideService(
     IUnitOfWork unitOfWork,
     IRideWriteLock writeLock,
     IPickupRoutes pickupRoutes,
-    IDriverRoam roam,
     ILogger<RideService> logger) : IRideService
 {
     public async Task<RideOutcome> CreateAsync(Guid riderId, Guid quoteId, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -192,14 +191,16 @@ public sealed class RideService(
                 arrivedDriver.SpeedKmh = 0;
         }
 
-        if (target == RideStatus.InProgress)
-            await SnapToRouteStartAsync(ride, cancellationToken);
-
         if (target == RideStatus.DroppedOff && ride.DriverId is Guid droppedDriverId)
         {
             var dropped = await drivers.FindAsync(droppedDriverId, cancellationToken);
             if (dropped is not null)
-                roam.Begin(dropped.UserId, dropped.Lat, dropped.Lng);
+            {
+                dropped.Heading = Geo.BearingDegrees(dropped.Lat, dropped.Lng, ride.Dropoff.Lat, ride.Dropoff.Lng);
+                dropped.Lat = ride.Dropoff.Lat;
+                dropped.Lng = ride.Dropoff.Lng;
+                dropped.SpeedKmh = 0;
+            }
         }
 
         var result = await StatusResultAsync(ride, cancellationToken);
@@ -212,23 +213,6 @@ public sealed class RideService(
         logger.LogInformation(new EventId(2001, "RideStatusChanged"),
             "Ride {RideId} changed from {FromStatus} to {Status} with driver {DriverId}",
             ride.Id, previousStatus.ToString(), ride.Status.ToString(), ride.DriverId);
-
-    private async Task SnapToRouteStartAsync(Ride ride, CancellationToken cancellationToken)
-    {
-        ride.SegmentIndex = 0;
-        ride.SegmentOffsetM = 0;
-        if (ride.Route.Coordinates.Length == 0 || ride.DriverId is not Guid driverId)
-            return;
-
-        var driver = await drivers.FindAsync(driverId, cancellationToken);
-        if (driver is null)
-            return;
-
-        var start = ride.Route.Coordinates[0];
-        driver.Lng = start[0];
-        driver.Lat = start[1];
-        driver.SpeedKmh = 0;
-    }
 
     private async Task ReleaseDriverAsync(Ride ride, CancellationToken cancellationToken)
     {

@@ -178,8 +178,8 @@ function closestOnSegment(start: LatLng, end: LatLng, point: LatLng): { point: L
   return { point: snapped, distanceM: haversineMeters(snapped, point), alongSegmentM: t * lengthM };
 }
 
-export function riderPosition(status: string | undefined, pickup: LatLng, driver: LatLng | null): LatLng {
-  if ((status === "InProgress" || status === "DroppedOff") && isPlotted(driver)) return driver;
+// The rider stays at the pickup. Drop off moves only the driver.
+export function riderPosition(_status: string | undefined, pickup: LatLng, _driver: LatLng | null): LatLng {
   return pickup;
 }
 

@@ -43,10 +43,9 @@ export function riderMap({ ride, live, pickup: selected, destination, quote }: P
       ride.status !== "NoDriver" &&
       ride.status !== "Cancelled",
   );
-  const together = ride?.status === "InProgress" || ride?.status === "DroppedOff";
   const riderPoint = riderPosition(ride?.status, pickup, driverPoint);
   const markers: MapMarker[] = [];
-  if (isPlotted(riderPoint)) markers.push({ ...riderPoint, kind: "pickup", offset: together ? [-16, 8] : undefined });
+  if (isPlotted(riderPoint)) markers.push({ ...riderPoint, kind: "pickup" });
   if (dropoff && isPlotted(dropoff) && (ride || quote)) markers.push({ ...dropoff, kind: "dropoff" });
   if (showBike && driverPoint && isPlotted(driverPoint)) {
     markers.push({ ...driverPoint, kind: "bike", heading });

@@ -358,7 +358,7 @@ public class RideFlowTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task A_driver_rolls_to_a_nearby_place_after_drop_off()
+    public async Task A_roaming_driver_rolls_to_a_nearby_place()
     {
         await using var fixture = new ApiFactory(Database);
         var id = Guid.Parse(Khoa);
@@ -385,6 +385,61 @@ public class RideFlowTests(PostgresFixture postgres)
         var parked = await check.ServiceProvider.GetRequiredService<AppDbContext>().Drivers.FindAsync([id]);
         Assert.NotNull(parked);
         Assert.InRange(HaversineMeters(startLat, startLng, parked.Lat, parked.Lng), 180, 470);
+    }
+
+    [Fact]
+    public async Task Drop_off_moves_the_driver_once_and_leaves_the_pickup_in_place()
+    {
+        await using var fixture = new ApiFactory(Database);
+        var an = fixture.Client(An);
+        var khoa = fixture.Client(Khoa);
+        var rideId = await CreateRide(an);
+        var offerId = await PendingOffer(khoa, rideId);
+        await Read(await khoa.PostAsync($"/api/offers/{offerId}/accept", content: null), HttpStatusCode.OK);
+        Assert.Equal("DriverArrived", await StatusAfter(khoa, $"/api/rides/{rideId}/arrived"));
+        Assert.Equal("InProgress", await StatusAfter(khoa, $"/api/rides/{rideId}/start"));
+
+        var started = await Read(await an.GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        var pickupLat = started.GetProperty("pickup").GetProperty("lat").GetDouble();
+        var pickupLng = started.GetProperty("pickup").GetProperty("lng").GetDouble();
+        var dropLat = started.GetProperty("dropoff").GetProperty("lat").GetDouble();
+        var dropLng = started.GetProperty("dropoff").GetProperty("lng").GetDouble();
+        var driverLat = started.GetProperty("driver").GetProperty("lat").GetDouble();
+        var driverLng = started.GetProperty("driver").GetProperty("lng").GetDouble();
+
+        for (var step = 0; step < 5; step++)
+        {
+            await using var scope = fixture.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IDriverSimulationService>()
+                .AdvanceAsync(DateTimeOffset.UtcNow, 80, CancellationToken.None);
+        }
+
+        var waiting = await Read(await an.GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal("InProgress", waiting.GetProperty("status").GetString());
+        Assert.Equal(driverLat, waiting.GetProperty("driver").GetProperty("lat").GetDouble(), 5);
+        Assert.Equal(driverLng, waiting.GetProperty("driver").GetProperty("lng").GetDouble(), 5);
+        Assert.Equal(pickupLat, waiting.GetProperty("pickup").GetProperty("lat").GetDouble(), 5);
+        Assert.Equal(pickupLng, waiting.GetProperty("pickup").GetProperty("lng").GetDouble(), 5);
+
+        var dropped = await Read(await khoa.PostAsync($"/api/rides/{rideId}/dropoff", content: null), HttpStatusCode.OK);
+        Assert.Equal("DroppedOff", dropped.GetProperty("status").GetString());
+        Assert.Equal(dropLat, dropped.GetProperty("driver").GetProperty("lat").GetDouble(), 5);
+        Assert.Equal(dropLng, dropped.GetProperty("driver").GetProperty("lng").GetDouble(), 5);
+        Assert.Equal(pickupLat, dropped.GetProperty("pickup").GetProperty("lat").GetDouble(), 5);
+        Assert.Equal(pickupLng, dropped.GetProperty("pickup").GetProperty("lng").GetDouble(), 5);
+
+        for (var step = 0; step < 5; step++)
+        {
+            await using var scope = fixture.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IDriverSimulationService>()
+                .AdvanceAsync(DateTimeOffset.UtcNow, 80, CancellationToken.None);
+        }
+
+        var held = await Read(await an.GetAsync($"/api/rides/{rideId}"), HttpStatusCode.OK);
+        Assert.Equal(dropLat, held.GetProperty("driver").GetProperty("lat").GetDouble(), 5);
+        Assert.Equal(dropLng, held.GetProperty("driver").GetProperty("lng").GetDouble(), 5);
+        Assert.Equal(pickupLat, held.GetProperty("pickup").GetProperty("lat").GetDouble(), 5);
+        Assert.Equal(pickupLng, held.GetProperty("pickup").GetProperty("lng").GetDouble(), 5);
     }
 
     [Fact]

@@ -24,10 +24,9 @@ export function driverMap({ ride, live, offer, center, me }: Pick<DriverDashboar
   const markers: MapMarker[] = [];
   const pickupPoint = ride?.pickup ?? offer?.pickup ?? null;
   const dropoffPoint = ride?.dropoff ?? offer?.dropoff ?? null;
-  const together = ride?.status === "InProgress" || ride?.status === "DroppedOff";
   const riderPoint = pickupPoint ? riderPosition(ride?.status, pickupPoint, driverPoint) : null;
   if (riderPoint && isPlotted(riderPoint) && (ride || offer)) {
-    markers.push({ ...riderPoint, kind: "pickup", offset: together ? [-16, 8] : undefined });
+    markers.push({ ...riderPoint, kind: "pickup" });
   }
   if (dropoffPoint && isPlotted(dropoffPoint) && (ride || offer)) markers.push({ ...dropoffPoint, kind: "dropoff" });
   if (driverPoint && ride && isPlotted(driverPoint)) {
