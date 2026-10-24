@@ -92,11 +92,10 @@ public sealed class DriverSimulationService(
 
     private async Task RoamAsync(List<OutboundEvent> events, DateTimeOffset now, double stepMeters, CancellationToken cancellationToken)
     {
-        var roamStep = Math.Min(stepMeters, 20);
         foreach (var driverId in roam.Drivers())
         {
             var driver = await drivers.FindAsync(driverId, cancellationToken);
-            if (driver is null)
+            if (driver is null || !roam.TryTarget(driverId, out _, out _))
             {
                 roam.Clear(driverId);
                 continue;
@@ -113,23 +112,12 @@ public sealed class DriverSimulationService(
                 }
             }
 
-            if (!roam.TryAdvance(driverId, driver.Lat, driver.Lng, roamStep, out var moved))
-            {
-                driver.SpeedKmh = 0;
-                roam.Clear(driverId);
+            if (!roam.TryAdvance(driverId, stepMeters, out var moved))
                 continue;
-            }
 
             ApplyMovement(driver, moved.Lat, moved.Lng, moved.Heading, moved.MovedM);
-            if (moved.MovedM >= 0.5)
-            {
-                var tracked = ride;
-                if (tracked is null && moved.RideId is Guid roamRideId)
-                    tracked = await rides.FindAsync(roamRideId, cancellationToken);
-                if (tracked is not null && tracked.Status is RideStatus.DroppedOff or RideStatus.Completed)
-                    events.Add(LocationEvent(tracked, driver, now));
-            }
-
+            if (ride is not null && ride.Status == RideStatus.DroppedOff && moved.MovedM >= 0.5)
+                events.Add(LocationEvent(ride, driver, now));
             if (moved.Finished)
             {
                 driver.SpeedKmh = 0;

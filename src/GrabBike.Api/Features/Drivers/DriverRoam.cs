@@ -15,17 +15,15 @@ public readonly record struct RoamStep(
     double Lng,
     double Heading,
     double MovedM,
-    bool Finished,
-    Guid? RideId,
-    Guid? RiderId);
+    bool Finished);
 
 public interface IDriverRoam
 {
-    void Begin(Guid driverId, double lat, double lng, Guid? rideId = null, Guid? riderId = null);
+    void Begin(Guid driverId, double lat, double lng);
     bool TryTarget(Guid driverId, out double lat, out double lng);
     IReadOnlyList<RoamRouteRequest> PendingRoutes();
     void SetRoute(Guid driverId, long ticket, GeoRoute route);
-    bool TryAdvance(Guid driverId, double currentLat, double currentLng, double stepMeters, out RoamStep step);
+    bool TryAdvance(Guid driverId, double stepMeters, out RoamStep step);
     IReadOnlyList<Guid> Drivers();
     void Clear(Guid driverId);
 }
@@ -36,7 +34,7 @@ public sealed class DriverRoam : IDriverRoam
     private readonly Dictionary<Guid, Plan> _targets = new();
     private long _nextTicket;
 
-    public void Begin(Guid driverId, double lat, double lng, Guid? rideId = null, Guid? riderId = null)
+    public void Begin(Guid driverId, double lat, double lng)
     {
         var bearing = Random.Shared.NextDouble() * 360d;
         var distance = 200d + Random.Shared.NextDouble() * 250d;
@@ -44,7 +42,7 @@ public sealed class DriverRoam : IDriverRoam
         lock (_gate)
         {
             var ticket = ++_nextTicket;
-            _targets[driverId] = new Plan(ticket, lat, lng, target.Lat, target.Lng, rideId, riderId);
+            _targets[driverId] = new Plan(ticket, lat, lng, target.Lat, target.Lng);
         }
     }
 
@@ -84,41 +82,32 @@ public sealed class DriverRoam : IDriverRoam
 
     public void SetRoute(Guid driverId, long ticket, GeoRoute route)
     {
-        var chosen = RouteLengthMeters(route.Coordinates) >= 50
-            ? route
-            : null;
         lock (_gate)
         {
             if (!_targets.TryGetValue(driverId, out var plan) || plan.Ticket != ticket || plan.Route is not null)
                 return;
 
-            plan.Route = chosen ?? PickupRoutes.Straight(plan.StartLat, plan.StartLng, plan.TargetLat, plan.TargetLng);
+            plan.Route = IsUsableRoamRoute(plan, route.Coordinates)
+                ? route
+                : PickupRoutes.Straight(plan.StartLat, plan.StartLng, plan.TargetLat, plan.TargetLng);
         }
     }
 
-    public bool TryAdvance(Guid driverId, double currentLat, double currentLng, double stepMeters, out RoamStep step)
+    public bool TryAdvance(Guid driverId, double stepMeters, out RoamStep step)
     {
         lock (_gate)
         {
-            if (!_targets.TryGetValue(driverId, out var plan))
+            if (!_targets.TryGetValue(driverId, out var plan) || plan.Route is not { Coordinates.Length: >= 2 } route)
             {
                 step = default;
                 return false;
             }
 
-            if (plan.Route is { Coordinates.Length: >= 2 } route)
-            {
-                var moved = Geo.AdvanceRoute(route.Coordinates, plan.Segment, plan.OffsetM, stepMeters);
-                plan.Segment = moved.Segment;
-                plan.OffsetM = moved.OffsetM;
-                var finished = moved.Segment >= route.Coordinates.Length - 1 || moved.MovedM < 0.5;
-                step = new RoamStep(moved.Lat, moved.Lng, moved.Heading, moved.MovedM, finished, plan.RideId, plan.RiderId);
-                return true;
-            }
-
-            var straight = Geo.MoveToward(currentLat, currentLng, plan.TargetLat, plan.TargetLng, stepMeters);
-            var done = Geo.HaversineMeters(straight.Lat, straight.Lng, plan.TargetLat, plan.TargetLng) < 15 || straight.MovedM < 0.5;
-            step = new RoamStep(straight.Lat, straight.Lng, straight.Heading, straight.MovedM, done, plan.RideId, plan.RiderId);
+            var moved = Geo.AdvanceRoute(route.Coordinates, plan.Segment, plan.OffsetM, stepMeters);
+            plan.Segment = moved.Segment;
+            plan.OffsetM = moved.OffsetM;
+            var finished = moved.Segment >= route.Coordinates.Length - 1 || moved.MovedM < 0.5;
+            step = new RoamStep(moved.Lat, moved.Lng, moved.Heading, moved.MovedM, finished);
             return true;
         }
     }
@@ -133,6 +122,18 @@ public sealed class DriverRoam : IDriverRoam
     {
         lock (_gate)
             _targets.Remove(driverId);
+    }
+
+    private static bool IsUsableRoamRoute(Plan plan, double[][] coordinates)
+    {
+        if (coordinates.Length < 2 || RouteLengthMeters(coordinates) < 50)
+            return false;
+
+        var end = coordinates[^1];
+        if (end.Length < 2)
+            return false;
+
+        return Geo.HaversineMeters(plan.StartLat, plan.StartLng, end[1], end[0]) >= 100;
     }
 
     private static double RouteLengthMeters(double[][] coordinates)
@@ -153,17 +154,13 @@ public sealed class DriverRoam : IDriverRoam
         double startLat,
         double startLng,
         double targetLat,
-        double targetLng,
-        Guid? rideId,
-        Guid? riderId)
+        double targetLng)
     {
         public long Ticket { get; } = ticket;
         public double StartLat { get; } = startLat;
         public double StartLng { get; } = startLng;
         public double TargetLat { get; } = targetLat;
         public double TargetLng { get; } = targetLng;
-        public Guid? RideId { get; } = rideId;
-        public Guid? RiderId { get; } = riderId;
         public GeoRoute? Route { get; set; }
         public int Segment { get; set; }
         public double OffsetM { get; set; }

@@ -178,20 +178,27 @@ test("after drop-off the rider stays at the destination while only the driver mo
     round: 1,
     driver: { userId: "driver-1", name: "HanoiD02", plate: "29-P1 200.02", lat: dropoff.lat, lng: dropoff.lng },
   };
-  for (const status of ["DroppedOff", "Completed"]) {
-    const view = riderMap({
-      ride: { ...ride, status },
-      live: roaming,
-      pickup: { id: "home", name: pickup.address, address: pickup.address, lat: pickup.lat, lng: pickup.lng },
-      destination: null,
-      quote: null,
-    });
-    assert.deepEqual(view.route, []);
-    assert.deepEqual(view.markers, [
-      { ...dropoff, kind: "pickup" },
-      { lat: roaming.lat, lng: roaming.lng, kind: "bike", heading: 15 },
-    ]);
-  }
+  const riderView = riderMap({
+    ride,
+    live: roaming,
+    pickup: { id: "home", name: pickup.address, address: pickup.address, lat: pickup.lat, lng: pickup.lng },
+    destination: null,
+    quote: null,
+  });
+  assert.deepEqual(riderView.route, []);
+  assert.deepEqual(riderView.markers, [
+    { ...dropoff, kind: "pickup", offset: undefined },
+    { lat: roaming.lat, lng: roaming.lng, kind: "bike", heading: 15 },
+  ]);
+  const completedView = riderMap({
+    ride: { ...ride, status: "Completed" },
+    live: roaming,
+    pickup: { id: "home", name: pickup.address, address: pickup.address, lat: pickup.lat, lng: pickup.lng },
+    destination: null,
+    quote: null,
+  });
+  assert.deepEqual(completedView.route, []);
+  assert.deepEqual(completedView.markers, [{ ...dropoff, kind: "pickup" }]);
   const driverView = driverMap({
     ride,
     live: roaming,
@@ -204,6 +211,14 @@ test("after drop-off the rider stays at the destination while only the driver mo
     { ...dropoff, kind: "pickup", offset: undefined },
     { lat: roaming.lat, lng: roaming.lng, kind: "bike", heading: 15 },
   ]);
+  const parkedDriverView = driverMap({
+    ride: null,
+    live: roaming,
+    offer: null,
+    center: pickup,
+    me: { id: "driver-1", name: "HanoiD02", role: "Driver", city: "Hanoi", plate: "29-P1 200.02", lat: 21.036, lng: 105.845 },
+  });
+  assert.deepEqual(parkedDriverView.markers, [{ lat: 21.036, lng: 105.845, kind: "bike" }]);
 });
 
 test("a finished ride leaves the rider at the drop-off", () => {

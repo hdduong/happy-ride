@@ -38,13 +38,8 @@ export function driverMap({ ride, live, offer, center, me }: Pick<DriverDashboar
     const heading = driverLive?.heading != null ? driverLive.heading : bearing(driverPoint, target);
     markers.push({ ...driverPoint, kind: "bike", heading });
   }
-  const selfLive = !ride && live && (!me || !live.driverId || live.driverId === me.id) ? live : null;
-  const self = selfLive
-    ? { lat: selfLive.lat, lng: selfLive.lng, heading: selfLive.heading ?? undefined }
-    : me?.lat != null && me.lng != null
-      ? { lat: me.lat, lng: me.lng, heading: undefined }
-      : null;
-  if (!driverPoint && self && isPlotted(self)) markers.push({ ...self, kind: "bike", heading: self.heading });
+  const self = me?.lat != null && me.lng != null ? { lat: me.lat, lng: me.lng } : null;
+  if (!driverPoint && self && isPlotted(self)) markers.push({ ...self, kind: "bike" });
   const focus = dropped && dropoffPoint && isPlotted(dropoffPoint) ? dropoffPoint : pickupPoint;
 
   return { center: focus && isPlotted(focus) ? focus : self && isPlotted(self) ? self : center, route, markers };
