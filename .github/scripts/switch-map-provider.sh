@@ -74,12 +74,12 @@ on_exit() {
 trap on_exit EXIT
 trap 'exit 143' TERM INT
 
-changed=1
 az webapp config appsettings set \
   --resource-group "$rg" \
   --name "$app" \
   --settings "Maps__Provider=$provider" \
   --output none
+changed=1
 echo "Maps__Provider is now $provider"
 
 echo "Waiting for the API to report ${provider}."
