@@ -1,0 +1,19 @@
+using System.Text.Json.Serialization;
+using GrabBike.Api.Features.Dispatch;
+using GrabBike.Api.Features.Drivers;
+using GrabBike.Api.Features.Rides;
+
+namespace GrabBike.Api.Features.Realtime;
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(OutboundEvent.OfferReceived), "offer")]
+[JsonDerivedType(typeof(OutboundEvent.OfferClosed), "offerClosed")]
+[JsonDerivedType(typeof(OutboundEvent.StatusChanged), "status")]
+[JsonDerivedType(typeof(OutboundEvent.Location), "location")]
+public abstract record OutboundEvent
+{
+    public sealed record OfferReceived(Guid DriverId, OfferDto Offer) : OutboundEvent;
+    public sealed record OfferClosed(Guid DriverId, Guid OfferId, Guid RideId, string Reason) : OutboundEvent;
+    public sealed record StatusChanged(RideView View, Guid RiderId, Guid? DriverId) : OutboundEvent;
+    public sealed record Location(Guid RiderId, Guid DriverId, DriverLocationDto Payload) : OutboundEvent;
+}

@@ -374,7 +374,7 @@ public sealed class BusinessLoggingTests(PostgresFixture postgres)
             var offers = new OfferRepository(fixture._db);
             var drivers = new DriverRepository(fixture._db);
             var dispatch = new DispatchService(offers, drivers);
-            var writeLock = new RideWriteLock();
+            var writeLock = new RideWriteLock(fixture._connectionString);
             var pickupRoutes = new PickupRoutes();
             fixture.UnitOfWork = new SavingUnitOfWork(fixture._db);
             var bus = new InlineDispatchBus(async (message, cancellationToken) =>
