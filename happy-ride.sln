@@ -5,9 +5,9 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GrabBike.Api", "src\GrabBike.Api\GrabBike.Api.csproj", "{758B5EB5-5E4B-454A-A285-C99A35A2A069}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HappyRide.Api", "src\HappyRide.Api\HappyRide.Api.csproj", "{758B5EB5-5E4B-454A-A285-C99A35A2A069}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GrabBike.Api.Tests", "tests\GrabBike.Api.Tests\GrabBike.Api.Tests.csproj", "{47B632C8-9964-4822-AA6E-83DFBC4A8DD1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HappyRide.Api.Tests", "tests\HappyRide.Api.Tests\HappyRide.Api.Tests.csproj", "{47B632C8-9964-4822-AA6E-83DFBC4A8DD1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

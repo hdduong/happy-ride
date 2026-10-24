@@ -1,4 +1,4 @@
-# GrabBike Clone — 3-Day Build Plan
+# Happy Ride — 3-Day Build Plan
 
 Spec for coding agents. Decisions come from `project-context.md`; the brief is `vietnam-bike-rideshare-design.pdf`. One engineer (Hien) plus agents, 3 days from 20 Oct 2026. Only the five-step core flow must work; everything in section 6's non-goals is off the table.
 
@@ -11,7 +11,7 @@ The current demo's feature boundaries and implementation limits are documented i
 ```
 .github/workflows/ci.yml, deploy.yml
 infra/main.bicep, infra/modules/*.bicep, infra/main.parameters.json
-src/GrabBike.Api/              # single ASP.NET Core (.NET 10) project, vertical slices
+src/HappyRide.Api/              # single ASP.NET Core (.NET 10) project, vertical slices
   Features/Maps/        IMapProvider, VietMapProvider, GoogleMapsProvider, FakeMapProvider, MapProviderResolver, endpoints
   Features/Rides/       Ride, RideStatus, RideService (state machine), endpoints
   Features/Dispatch/    IDispatchBus (ServiceBus + InMemory), DispatchWorker, OfferService, endpoints
@@ -19,7 +19,7 @@ src/GrabBike.Api/              # single ASP.NET Core (.NET 10) project, vertical
   Features/Realtime/    RideHub, DevUserIdProvider
   Features/Dev/         DevIdentityMiddleware, DevEndpoints, DriverSimulator, Seed
   Infrastructure/       AppDbContext (EF Core + Npgsql + NetTopologySuite), Migrations
-tests/GrabBike.Api.Tests/      # xUnit + Testcontainers (Postgres)
+tests/HappyRide.Api.Tests/      # xUnit + Testcontainers (Postgres)
 web/                           # Next.js App Router, output: 'export'
   app/page.tsx (user picker)  app/rider/  app/driver/  app/sim/
   features/rider/       booking hook and rider components

@@ -78,7 +78,7 @@ jobs:
       - name: Test the ride flow
         working-directory: e2e
         env:
-          ConnectionStrings__GrabBike: Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride
+          ConnectionStrings__HappyRide: Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride
         run: npm test
 
   request-deploy:

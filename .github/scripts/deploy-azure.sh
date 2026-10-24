@@ -66,7 +66,7 @@ az webapp config set \
   --name "$API_APP" \
   --always-on true \
   --web-sockets-enabled true \
-  --startup-file "chmod +x ./GrabBike.Api && ./GrabBike.Api" --output none
+  --startup-file "if [ -f ./HappyRide.Api ]; then chmod +x ./HappyRide.Api && ./HappyRide.Api; else chmod +x ./GrabBike.Api && ./GrabBike.Api; fi" --output none
 
 az webapp config appsettings set \
   --resource-group "$RG" \

@@ -7,7 +7,7 @@ This document describes the implemented demo. [The build plan](build-plan.md) de
 ## Backend
 
 ```text
-src/GrabBike.Api/
+src/HappyRide.Api/
   Features/
     Rides/       ride lifecycle, command outcomes, queries, HTTP endpoints
     Dispatch/    offers, driver selection, round expiration

@@ -120,7 +120,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Publish the API
-        run: dotnet publish src/GrabBike.Api/GrabBike.Api.csproj --configuration Release --runtime linux-x64 --self-contained true --output publish/api
+        run: dotnet publish src/HappyRide.Api/HappyRide.Api.csproj --configuration Release --runtime linux-x64 --self-contained true --output publish/api
 
       - name: Build the web app
         working-directory: web
@@ -198,6 +198,7 @@ jobs:
             --resource-group "${AZURE_RESOURCE_GROUP:-rg-grabbike-dev}" \
             --name "${AZURE_API_APP:-app-grabbike-api}" \
             --settings \
+              ConnectionStrings__HappyRide="Host=${host};Database=happyride;Username=happyride;Password=${POSTGRES_ADMIN_PASSWORD};SSL Mode=Require" \
               ConnectionStrings__GrabBike="Host=${host};Database=happyride;Username=happyride;Password=${POSTGRES_ADMIN_PASSWORD};SSL Mode=Require" \
               Dispatch__Bus="ServiceBus" \
               ServiceBus__ConnectionString="$bus" \

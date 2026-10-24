@@ -5,7 +5,7 @@
 [![Deployment](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml/badge.svg)](https://github.com/hdduong/happy-ride/actions/workflows/deploy.yml)
 [![version](https://img.shields.io/badge/version-v1.0.149-blue?style=flat-square)](https://github.com/hdduong/happy-ride/releases/tag/v1.0.149)
 
-Motorbike ride-hailing MVP for Hanoi and Ho Chi Minh City built with an ASP.NET Core 10 API (`src/GrabBike.Api`), PostgreSQL/PostGIS, SignalR, and a Next.js rider and driver web app (`web/`).
+Motorbike ride-hailing MVP for Hanoi and Ho Chi Minh City built with an ASP.NET Core 10 API (`src/HappyRide.Api`), PostgreSQL/PostGIS, SignalR, and a Next.js rider and driver web app (`web/`).
 
 ## Screenshots
 
@@ -43,7 +43,7 @@ docker run -d \
   postgis/postgis:16-3.4
 ```
 
-If you have a `docker-compose.yml` configured for the workspace, `docker compose up -d` starts the same database. The default connection string in `src/GrabBike.Api/appsettings.json` is:
+If you have a `docker-compose.yml` configured for the workspace, `docker compose up -d` starts the same database. The default connection string in `src/HappyRide.Api/appsettings.json` is:
 
 ```text
 Host=localhost;Port=5432;Database=happyride;Username=happyride;Password=happyride
@@ -54,7 +54,7 @@ On startup, the API enables the `postgis` extension, creates the schema, and see
 ### 2. Run the API
 
 ```bash
-dotnet run --project src/GrabBike.Api --launch-profile http
+dotnet run --project src/HappyRide.Api --launch-profile http
 ```
 
 The API listens at `http://localhost:5080`. Interactive OpenAPI docs are available at `http://localhost:5080/scalar/v1` and `http://localhost:5080/swagger` (`/` and `/scalar` redirect to Scalar).
@@ -110,7 +110,7 @@ A merge into `main` runs **Build** and **CI**. Build compiles the API and the we
 Running the deployment workflow provisions and updates the following resources in `rg-grabbike-dev` (`southeastasia` by default) via `.github/scripts/deploy-azure.sh` and `infra/main.bicep`:
 
 - **App Service Plan (`plan-grabbike`):** Linux `B1` plan shared by the API and web apps.
-- **API App Service (`app-grabbike-api`):** Self-contained `linux-x64` deployment of `GrabBike.Api` with WebSockets enabled.
+- **API App Service (`app-grabbike-api`):** Self-contained `linux-x64` deployment of `HappyRide.Api` with WebSockets enabled.
 - **Web App Service (`app-grabbike-web`):** Next.js standalone Node 22 server that proxies `/backend/*` to the API and attaches Microsoft Entra application tokens when configured.
 - **Azure Database for PostgreSQL Flexible Server (`psql-grabbike-*`):** PostgreSQL 16 (`Standard_B1ms`) with the `POSTGIS` extension enabled and database `happyride`.
 - **Azure Service Bus (`sb-grabbike-*`):** Basic tier namespace with the `dispatch` queue (`Dispatch__Bus=ServiceBus`).
