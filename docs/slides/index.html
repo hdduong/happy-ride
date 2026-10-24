@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Why Happy Ride — Show & Tell</title>
+<style>
+  :root {
+    --bg: #0f1012;
+    --panel: #16181c;
+    --panel-2: #1c1f25;
+    --ink: #f3f0e8;
+    --muted: #9ca3af;
+    --line: #282c34;
+    --down: #ef5350;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --accent: #d7c4a3;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+    overflow: hidden;
+  }
+  body.grid-mode { overflow-y: auto; }
+
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 50px;
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(15, 16, 18, 0.92);
+    border-bottom: 1px solid var(--line);
+    z-index: 20;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .brand strong { color: var(--ink); font-weight: 700; }
+  .controls { display: flex; align-items: center; gap: 8px; }
+  .dots { display: flex; gap: 6px; margin-right: 8px; }
+  .dot {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dot.active {
+    background: var(--accent);
+    color: #111;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+  .btn {
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); background: var(--panel-2); }
+
+  .deck { height: 100vh; padding-top: 50px; }
+  .slide {
+    display: none;
+    height: calc(100vh - 50px);
+    padding: 24px 44px 28px;
+    flex-direction: column;
+    justify-content: space-between;
+    max-width: 1480px;
+    margin: 0 auto;
+  }
+  .slide.active { display: flex; }
+
+  body.grid-mode .deck {
+    height: auto;
+    padding: 68px 28px 36px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 22px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  body.grid-mode .slide {
+    display: flex;
+    height: 520px;
+    padding: 20px 24px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  body.grid-mode .slide.active { outline: 2px solid var(--accent); }
+
+  .kicker {
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 11px;
+    color: var(--accent);
+    margin: 0 0 4px;
+    font-weight: 700;
+  }
+  h2 {
+    font-family: "Iowan Old Style", Palatino, Georgia, serif;
+    font-size: 32px;
+    line-height: 1.1;
+    font-weight: 500;
+    margin: 0 0 12px;
+  }
+  a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  a:hover { color: #fff; }
+
+  .split {
+    display: grid;
+    grid-template-columns: 0.92fr 1.28fr;
+    gap: 20px;
+    min-height: 0;
+    flex: 1;
+  }
+  .split-equal {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .shot {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .shot-bar {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel-2);
+    flex-shrink: 0;
+  }
+  .shot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+    min-height: 0;
+  }
+
+  .news-grid {
+    display: grid;
+    grid-template-rows: 1.05fr 1fr;
+    gap: 12px;
+    min-height: 0;
+  }
+  .news-grid .shot {
+    background: #ffffff;
+  }
+  .news-grid .shot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: top center;
+    background: #ffffff;
+    padding: 6px 10px;
+  }
+  .news-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .kpi {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .kpi-val {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.05;
+  }
+  .kpi-lbl {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .down { color: var(--down); }
+  .amber { color: var(--amber); }
+  .green { color: var(--green); }
+
+  .slide-footer {
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <strong>Happy Ride</strong>
+    <span>Show &amp; Tell</span>
+  </div>
+  <div class="controls">
+    <div class="dots" id="dots"></div>
+    <button class="btn" id="prevBtn">← Prev</button>
+    <button class="btn" id="nextBtn">Next →</button>
+    <button class="btn" id="gridBtn">Overview (G)</button>
+  </div>
+</header>
+
+<main class="deck" id="deck">
+
+  <!-- SLIDE 1: GRAB STOCK (3 MONTHS) -->
+  <section class="slide active" data-slide="1">
+    <div style="display:flex; flex-direction:column; min-height:0; flex:1;">
+      <p class="kicker">01 · NASDAQ: GRAB · Last 3 Months</p>
+      <h2>Grab stock keeps going down ($3.30 → $2.85)</h2>
+
+      <div class="split">
+        <div class="card" style="justify-content:space-between; gap:12px;">
+          <div class="kpi-strip" style="margin-bottom:0;">
+            <div class="kpi">
+              <div class="kpi-val down">−13.6%</div>
+              <div class="kpi-lbl">3M ($3.30 → $2.85)</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-val down">−28.0%</div>
+              <div class="kpi-lbl">Past 6 Months</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-val">$2.85</div>
+              <div class="kpi-lbl">Near $2.74 52w Low</div>
+            </div>
+          </div>
+
+          <div class="shot" style="flex:1; min-height:0; background:#005339;">
+            <div class="shot-bar">
+              <span>Grab Ride App · Book Rides &amp; Upfront Fares</span>
+              <a href="https://play.google.com/store/apps/details?id=com.grabtaxi.passenger&hl=en" target="_blank" rel="noopener">Grab App ↗</a>
+            </div>
+            <img src="grab-platform.png" alt="Grab app ride booking screenshots" style="width:100%; height:100%; object-fit:fill; display:block;" />
+          </div>
+
+          <div style="font-size:12px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap;">
+            <a href="https://www.google.com/finance/quote/GRAB:NASDAQ?window=6M" target="_blank" rel="noopener">Google Finance (6M) ↗</a>
+            <a href="https://finance.yahoo.com/quote/GRAB/history/" target="_blank" rel="noopener">Yahoo Finance ↗</a>
+            <a href="https://chartexchange.com/symbol/nasdaq-grab/historical/" target="_blank" rel="noopener">ChartExchange (3M Closes) ↗</a>
+          </div>
+        </div>
+
+        <div class="shot" style="background:#131314;">
+          <div class="shot-bar">
+            <span>Google Finance · GRAB:NASDAQ · Past 6 Months (−28.03%)</span>
+            <a href="https://www.google.com/finance/quote/GRAB:NASDAQ?window=6M" target="_blank" rel="noopener">Live 6M chart ↗</a>
+          </div>
+          <img src="grab-google.png" alt="Google Finance 6-month screenshot for GRAB" style="object-fit:contain; padding:6px;" />
+        </div>
+      </div>
+    </div>
+
+    <div class="slide-footer">
+      <span>NASDAQ:GRAB · Jul 23 – Oct 22, 2026</span>
+      <span>Slide 1 / 4</span>
+    </div>
+  </section>
+
+  <!-- SLIDE 2: SOUTHEAST ASIA MAP DIAGRAM + 3 NEWS SCREENSHOTS -->
+  <section class="slide" data-slide="2">
+    <div style="display:flex; flex-direction:column; min-height:0; flex:1;">
+      <p class="kicker">02 · Southeast Asia · Platform Cut Protests &amp; Probes</p>
+      <h2>Vietnam, Indonesia &amp; Philippines: Drivers revolt over 20–50% cuts</h2>
+
+      <div class="split">
+        <!-- Left: Visual Southeast Asia Map & Commission Diagram -->
+        <div class="card" style="justify-content:space-between; padding:14px 16px;">
+          <svg viewBox="0 0 460 365" width="100%" height="100%" role="img" aria-label="Southeast Asia protest map and take-rate diagram">
+            <!-- Map Backdrop -->
+            <rect x="4" y="4" width="452" height="357" rx="10" fill="#111318" stroke="#282c34" />
+            <!-- Subtle Grid Lines -->
+            <line x1="4" y1="90" x2="456" y2="90" stroke="#1b1f27" />
+            <line x1="4" y1="180" x2="456" y2="180" stroke="#1b1f27" />
+            <line x1="4" y1="270" x2="456" y2="270" stroke="#1b1f27" />
+            <line x1="115" y1="4" x2="115" y2="361" stroke="#1b1f27" />
+            <line x1="230" y1="4" x2="230" y2="361" stroke="#1b1f27" />
+            <line x1="345" y1="4" x2="345" y2="361" stroke="#1b1f27" />
+
+            <!-- Stylized SEA Landmasses -->
+            <!-- Indochina / Vietnam -->
+            <path d="M55,38 L98,35 L125,68 L132,115 L112,158 L92,148 L96,105 L68,85 Z" fill="#1e2430" stroke="#333b4d" stroke-width="1.5" />
+            <!-- Malaysia / Sumatra / Java (Indonesia) -->
+            <path d="M72,175 L96,215 L88,242 L52,205 Z" fill="#1e2430" stroke="#333b4d" stroke-width="1.5" />
+            <path d="M40,225 L92,278 L82,292 L28,240 Z" fill="#1e2430" stroke="#333b4d" stroke-width="1.5" />
+            <path d="M98,298 L195,310 L192,324 L95,312 Z" fill="#1e2430" stroke="#333b4d" stroke-width="1.5" />
+            <!-- Borneo & Sulawesi -->
+            <path d="M135,215 L182,210 L188,258 L140,264 Z" fill="#1e2430" stroke="#333b4d" stroke-width="1.5" />
+            <!-- Philippines -->
+            <path d="M202,78 L228,82 L238,142 L212,165 L196,125 Z" fill="#1e2430" stroke="#333b4d" stroke-width="1.5" />
+
+            <!-- HOTSPOT 1: VIETNAM -->
+            <circle cx="122" cy="112" r="16" fill="rgba(239,83,80,0.22)" />
+            <circle cx="122" cy="112" r="6" fill="#ef5350" />
+            <line x1="128" y1="108" x2="180" y2="52" stroke="#ef5350" stroke-width="1.8" />
+            <rect x="180" y="16" width="264" height="96" rx="8" fill="#171a21" stroke="#ef5350" stroke-width="1.5" />
+            <text x="194" y="38" fill="#f3f0e8" font-size="13" font-weight="700">VIETNAM · Driver Boycott &amp; Gov Probe</text>
+            <text x="194" y="55" fill="#9ca3af" font-size="10">Grab commission: 20–25% (30–50% with fees &amp; tax)</text>
+            <rect x="194" y="66" width="116" height="22" rx="4" fill="rgba(16,185,129,0.25)" stroke="#10b981" />
+            <text x="200" y="81" fill="#f3f0e8" font-size="10" font-weight="700">Driver Keeps: 50–70%</text>
+            <rect x="314" y="66" width="120" height="22" rx="4" fill="rgba(239,83,80,0.35)" stroke="#ef5350" />
+            <text x="320" y="81" fill="#ef5350" font-size="10" font-weight="700">Grab Commission: 20–25%</text>
+            <text x="194" y="103" fill="#d7c4a3" font-size="10">Sep 2026 · VnExpress / Reuters / Bloomberg</text>
+
+            <!-- HOTSPOT 2: PHILIPPINES -->
+            <circle cx="218" cy="118" r="15" fill="rgba(245,158,11,0.22)" />
+            <circle cx="218" cy="118" r="5.5" fill="#f59e0b" />
+            <line x1="224" y1="122" x2="245" y2="155" stroke="#f59e0b" stroke-width="1.8" />
+            <rect x="180" y="130" width="264" height="96" rx="8" fill="#171a21" stroke="#f59e0b" stroke-width="1.5" />
+            <text x="194" y="152" fill="#f3f0e8" font-size="13" font-weight="700">PHILIPPINES · Driver &amp; Congress Hearings</text>
+            <text x="194" y="169" fill="#9ca3af" font-size="10">Grab commission: 20–23% (lawmakers push for 10%)</text>
+            <rect x="194" y="180" width="116" height="22" rx="4" fill="rgba(16,185,129,0.25)" stroke="#10b981" />
+            <text x="200" y="195" fill="#f3f0e8" font-size="10" font-weight="700">Driver Keeps: 77–80%</text>
+            <rect x="314" y="180" width="120" height="22" rx="4" fill="rgba(239,83,80,0.35)" stroke="#ef5350" />
+            <text x="320" y="195" fill="#ef5350" font-size="10" font-weight="700">Grab Commission: 20–23%</text>
+            <text x="194" y="217" fill="#d7c4a3" font-size="10">Apr &amp; Oct 2026 · Inquirer / Manila Times</text>
+
+            <!-- HOTSPOT 3: INDONESIA -->
+            <circle cx="122" cy="304" r="16" fill="rgba(239,83,80,0.22)" />
+            <circle cx="122" cy="304" r="6" fill="#ef5350" />
+            <line x1="128" y1="304" x2="180" y2="292" stroke="#ef5350" stroke-width="1.8" />
+            <rect x="180" y="244" width="264" height="100" rx="8" fill="#171a21" stroke="#10b981" stroke-width="1.5" />
+            <text x="194" y="266" fill="#f3f0e8" font-size="13" font-weight="700">INDONESIA · Protests Forced Gov Cap</text>
+            <text x="194" y="283" fill="#9ca3af" font-size="10">Grab commission: 20% → 8% on bikes (cars still 20%)</text>
+            <rect x="194" y="294" width="116" height="22" rx="4" fill="rgba(16,185,129,0.28)" stroke="#10b981" />
+            <text x="199" y="309" fill="#f3f0e8" font-size="10" font-weight="700">Driver Keeps: 80→92%</text>
+            <rect x="314" y="294" width="120" height="22" rx="4" fill="rgba(245,158,11,0.28)" stroke="#f59e0b" />
+            <text x="319" y="309" fill="#f59e0b" font-size="10" font-weight="700">Grab Commission: 20→8%</text>
+            <text x="194" y="334" fill="#d7c4a3" font-size="10">Jul 2026 · Reuters / The Business Times</text>
+          </svg>
+
+          <div style="font-size:11px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+            <a href="https://e.vnexpress.net/news/business/companies/vietnam-watchdog-probes-grab-fare-commission-policies-after-drivers-threaten-strike-5119485.html" target="_blank" rel="noopener">VnExpress ↗</a>
+            <a href="https://www.reuters.com/world/asia-pacific/vietnams-grab-drivers-call-two-day-app-boycott-over-falling-earnings-2026-09-10/" target="_blank" rel="noopener">Reuters VN ↗</a>
+            <a href="https://www.bloomberg.com/news/articles/2026-09-11/grab-faces-vietnam-review-of-commissions-as-drivers-plan-boycott" target="_blank" rel="noopener">Bloomberg ↗</a>
+            <a href="https://www.businesstimes.com.sg/international/asean/after-indonesia-grab-comes-under-pressure-vietnam-over-driver-earnings" target="_blank" rel="noopener">Business Times ↗</a>
+            <a href="https://www.reuters.com/world/asia-pacific/goto-grab-cut-driver-commissions-8-indonesia-2026-06-23/" target="_blank" rel="noopener">Reuters ID ↗</a>
+            <a href="https://www.manilatimes.net/2026/10/08/news/national/drivers-of-ride-hailing-platforms-seek-reforms/2441107" target="_blank" rel="noopener">Manila Times ↗</a>
+            <a href="https://newsinfo.inquirer.net/2213525/poe-to-ride-hailing-firms-cut-commissions-taken-from-drivers" target="_blank" rel="noopener">Inquirer ↗</a>
+          </div>
+        </div>
+
+        <!-- Right: 3 Real News Screenshots -->
+        <div class="news-grid">
+          <div class="shot">
+            <div class="shot-bar">
+              <span>Vietnam · VnExpress International</span>
+              <a href="https://e.vnexpress.net/news/business/companies/vietnam-watchdog-probes-grab-fare-commission-policies-after-drivers-threaten-strike-5119485.html" target="_blank" rel="noopener">Link ↗</a>
+            </div>
+            <img src="news-vnexpress.png" alt="VnExpress screenshot" />
+          </div>
+
+          <div class="news-bottom">
+            <div class="shot">
+              <div class="shot-bar">
+                <span>Indonesia &amp; Vietnam · Business Times</span>
+                <a href="https://www.businesstimes.com.sg/international/asean/after-indonesia-grab-comes-under-pressure-vietnam-over-driver-earnings" target="_blank" rel="noopener">Link ↗</a>
+              </div>
+              <img src="news-bt.png" alt="Business Times screenshot" />
+            </div>
+
+            <div class="shot">
+              <div class="shot-bar">
+                <span>Philippines · The Manila Times</span>
+                <a href="https://www.manilatimes.net/2026/10/08/news/national/drivers-of-ride-hailing-platforms-seek-reforms/2441107" target="_blank" rel="noopener">Link ↗</a>
+              </div>
+              <img src="news-manila.png" alt="Manila Times screenshot" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slide-footer">
+      <span>Southeast Asia · Vietnam (Sep 2026), Indonesia (Jul 2026), Philippines (Apr &amp; Oct 2026)</span>
+      <span>Slide 2 / 4</span>
+    </div>
+  </section>
+
+  <!-- SLIDE 3: AI COST COLLAPSE & THE SELF-SUSTAINING GOAL -->
+  <section class="slide" data-slide="3">
+    <div style="display:flex; flex-direction:column; min-height:0; flex:1;">
+      <p class="kicker">03 · AI Cost Collapse &amp; The Self-Sustaining Goal</p>
+      <h2>$29.30/mo cloud stack handles 3,000–5,000 rides/day — so drivers keep ~98–99%</h2>
+
+      <div class="split-equal">
+        <!-- LEFT: Legacy Overhead Stack vs AI-Maintained Stack (Less text, visual blocks) -->
+        <div class="card" style="justify-content:center; padding:16px 18px;">
+          <svg viewBox="0 0 540 345" width="100%" height="100%" role="img" aria-label="Cost stack comparison diagram">
+            <!-- Legacy Stack -->
+            <text x="24" y="26" fill="#ef5350" font-size="13" font-weight="700">LEGACY APP (~12,000 STAFF)</text>
+
+            <rect x="24" y="40" width="216" height="72" rx="8" fill="rgba(239,83,80,0.28)" stroke="#ef5350" stroke-width="1.5" />
+            <text x="42" y="72" fill="#f3f0e8" font-size="15" font-weight="700">12,000 Salaries &amp; Offices</text>
+            <text x="42" y="92" fill="#ef5350" font-size="11">Corporate &amp; R&amp;D payroll</text>
+
+            <rect x="24" y="122" width="216" height="62" rx="8" fill="rgba(239,83,80,0.2)" stroke="#ef5350" />
+            <text x="42" y="152" fill="#f3f0e8" font-size="14" font-weight="700">Marketing &amp; Subsidies</text>
+            <text x="42" y="170" fill="#9ca3af" font-size="11">Paid by 20–50% driver cut</text>
+
+            <rect x="24" y="194" width="216" height="58" rx="8" fill="rgba(239,83,80,0.14)" stroke="#ef5350" />
+            <text x="42" y="222" fill="#f3f0e8" font-size="14" font-weight="700">Corporate Profit Target</text>
+            <text x="42" y="240" fill="#9ca3af" font-size="11">Stock still down at $2.85</text>
+
+            <rect x="24" y="262" width="216" height="54" rx="8" fill="#1c1f25" stroke="#282c34" />
+            <text x="42" y="294" fill="#9ca3af" font-size="13" font-weight="700">Cloud Servers (~1–2%)</text>
+
+            <!-- Arrow between columns -->
+            <text x="255" y="160" fill="#10b981" font-size="24" font-weight="700">→</text>
+
+            <!-- Happy Ride Stack -->
+            <text x="292" y="26" fill="#10b981" font-size="13" font-weight="700">HAPPY RIDE (AI + 1 ENGINEER)</text>
+
+            <rect x="292" y="40" width="224" height="212" rx="10" fill="rgba(16,185,129,0.07)" stroke="#10b981" stroke-dasharray="5 5" />
+            <text x="322" y="122" fill="#10b981" font-size="19" font-weight="700">Replaced by AI</text>
+            <text x="322" y="148" fill="#f3f0e8" font-size="12">Planner · Implementer</text>
+            <text x="322" y="168" fill="#f3f0e8" font-size="12">Verifier · Reviewer</text>
+            <text x="322" y="198" fill="#d7c4a3" font-size="12" font-weight="700">→ Goes back to Driver &amp; Rider</text>
+
+            <rect x="292" y="262" width="224" height="54" rx="8" fill="rgba(16,185,129,0.28)" stroke="#10b981" stroke-width="2" />
+            <text x="312" y="286" fill="#f3f0e8" font-size="14" font-weight="700">Cloud Infra Only (~1–2%)</text>
+            <text x="312" y="304" fill="#10b981" font-size="11" font-weight="600">$29.30/mo Azure + Maps</text>
+          </svg>
+        </div>
+
+        <!-- RIGHT: Fare Split + $29.30/mo Concurrent Capacity -->
+        <div class="card" style="justify-content:center; padding:16px 18px;">
+          <svg viewBox="0 0 540 345" width="100%" height="100%" role="img" aria-label="Self-sustaining fare split and $29.30/mo capacity">
+            <!-- Bar 1: Legacy -->
+            <text x="12" y="24" fill="#ef5350" font-size="12" font-weight="700">LEGACY FARE SPLIT</text>
+            <rect x="12" y="34" width="295" height="52" rx="8" fill="#1c1f25" stroke="#9ca3af" />
+            <text x="28" y="65" fill="#f3f0e8" font-size="16" font-weight="700">Driver Keeps: 50% – 75%</text>
+
+            <rect x="315" y="34" width="213" height="52" rx="8" fill="rgba(239,83,80,0.3)" stroke="#ef5350" stroke-width="1.8" />
+            <text x="332" y="65" fill="#ef5350" font-size="16" font-weight="700">Grab Cut: 25% – 50%</text>
+
+            <!-- Bar 2: Happy Ride -->
+            <text x="12" y="114" fill="#10b981" font-size="12" font-weight="700">HAPPY RIDE FARE SPLIT</text>
+            <rect x="12" y="124" width="430" height="56" rx="8" fill="rgba(16,185,129,0.24)" stroke="#10b981" stroke-width="2" />
+            <text x="28" y="158" fill="#f3f0e8" font-size="18" font-weight="700">Driver &amp; Rider Keep ~98% – 99%</text>
+
+            <rect x="450" y="124" width="78" height="56" rx="8" fill="rgba(215,196,163,0.28)" stroke="#d7c4a3" stroke-width="2" />
+            <text x="464" y="150" fill="#d7c4a3" font-size="15" font-weight="700">~1–2%</text>
+            <text x="467" y="168" fill="#f3f0e8" font-size="10">Infra</text>
+
+            <!-- Capacity of the $29.30/mo Stack -->
+            <text x="12" y="210" fill="#d7c4a3" font-size="12" font-weight="700">WHAT OUR $29.30 / MONTH AZURE STACK HANDLES TODAY:</text>
+
+            <!-- 3 Visual Metric Cards -->
+            <rect x="12" y="222" width="164" height="106" rx="8" fill="#16181c" stroke="#d7c4a3" stroke-width="1.5" />
+            <text x="26" y="246" fill="#9ca3af" font-size="11" font-weight="600">MONTHLY CLOUD BILL</text>
+            <text x="26" y="280" fill="#d7c4a3" font-size="26" font-weight="700">$29.30/mo</text>
+            <text x="26" y="306" fill="#9ca3af" font-size="11">App B1 + PG B1ms + Bus</text>
+
+            <rect x="188" y="222" width="164" height="106" rx="8" fill="#16181c" stroke="#60a5fa" stroke-width="1.5" />
+            <text x="202" y="246" fill="#9ca3af" font-size="11" font-weight="600">CONCURRENT ONLINE</text>
+            <text x="202" y="278" fill="#60a5fa" font-size="24" font-weight="700">150 – 500</text>
+            <text x="202" y="298" fill="#f3f0e8" font-size="11">150–250 steady (24/7)</text>
+            <text x="202" y="315" fill="#9ca3af" font-size="10">350–500 peak burst</text>
+
+            <rect x="364" y="222" width="164" height="106" rx="8" fill="#16181c" stroke="#10b981" stroke-width="1.5" />
+            <text x="378" y="246" fill="#9ca3af" font-size="11" font-weight="600">COMPLETED RIDES</text>
+            <text x="378" y="278" fill="#10b981" font-size="24" font-weight="700">3k – 5k/day</text>
+            <text x="378" y="298" fill="#f3f0e8" font-size="11">90k – 150k rides / mo</text>
+            <text x="378" y="315" fill="#9ca3af" font-size="10">~$0.0002 server / ride</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="slide-footer">
+      <span>Happy Ride · $29.30/mo Azure footprint (B1 App Service + B1ms Postgres + Basic Service Bus)</span>
+      <span>Slide 3 / 4</span>
+    </div>
+  </section>
+
+  <!-- SLIDE 4: HOW HAPPY RIDE WORKS — ARCHITECTURE (FRONTEND, BACKEND & TECH STACK) -->
+  <section class="slide" data-slide="4">
+    <div style="display:flex; flex-direction:column; min-height:0; flex:1;">
+      <p class="kicker">04 · System Architecture · Live Map, SignalR &amp; Azure Service Bus</p>
+      <h2>How Happy Ride works (<code style="font-size:24px;">web/</code> + <code style="font-size:24px;">src/GrabBike.Api/</code>)</h2>
+
+      <div class="card" style="flex:1; justify-content:center; padding: 14px 18px;">
+        <svg viewBox="0 0 1320 490" width="100%" height="100%" role="img" aria-label="Happy Ride architecture diagram">
+          <defs>
+            <marker id="arrowGold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#d7c4a3" />
+            </marker>
+            <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+            </marker>
+            <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#60a5fa" />
+            </marker>
+            <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+            </marker>
+          </defs>
+
+          <!-- ==================== COLUMN 1: FRONTEND (MINIMAL & VISUAL) ==================== -->
+          <rect x="12" y="10" width="335" height="398" rx="12" fill="#12151b" stroke="#3b82f6" stroke-width="1.8" />
+          <rect x="28" y="24" width="110" height="22" rx="4" fill="rgba(59,130,246,0.2)" />
+          <text x="38" y="39" fill="#60a5fa" font-size="11" font-weight="700" letter-spacing="0.8">FRONTEND</text>
+          <text x="148" y="39" fill="#f3f0e8" font-size="13" font-weight="700">Next.js 15 · React 19 · TS</text>
+
+          <!-- 1. Rider & Driver Screens -->
+          <rect x="28" y="62" width="146" height="82" rx="8" fill="#181c24" stroke="#282c34" />
+          <text x="42" y="88" fill="#60a5fa" font-size="14" font-weight="700">Rider (/rider)</text>
+          <text x="42" y="110" fill="#f3f0e8" font-size="11">Quote &amp; Book Ride</text>
+          <text x="42" y="128" fill="#9ca3af" font-size="10">Track approaching bike</text>
+
+          <rect x="185" y="62" width="146" height="82" rx="8" fill="#181c24" stroke="#282c34" />
+          <text x="199" y="88" fill="#10b981" font-size="14" font-weight="700">Driver (/driver)</text>
+          <text x="199" y="110" fill="#f3f0e8" font-size="11">Accept Offer</text>
+          <text x="199" y="128" fill="#9ca3af" font-size="10">Start &amp; complete trip</text>
+
+          <!-- 2. Live Map Feature -->
+          <rect x="28" y="160" width="303" height="106" rx="10" fill="#181c24" stroke="#60a5fa" stroke-width="1.5" />
+          <text x="44" y="188" fill="#60a5fa" font-size="15" font-weight="700">Live Map Canvas</text>
+          <text x="44" y="210" fill="#f3f0e8" font-size="12" font-weight="600">VietMap GL  +  Google Maps</text>
+          <text x="44" y="232" fill="#9ca3af" font-size="11">• Street route polyline &amp; pickup/drop-off pins</text>
+          <text x="44" y="250" fill="#9ca3af" font-size="11">• Smooth moving bike marker (lat, lng, heading)</text>
+
+          <!-- 3. SignalR Realtime Client -->
+          <rect x="28" y="282" width="303" height="108" rx="10" fill="#181c24" stroke="#10b981" stroke-width="1.5" />
+          <text x="44" y="310" fill="#10b981" font-size="15" font-weight="700">SignalR Realtime Client</text>
+          <text x="44" y="332" fill="#f3f0e8" font-size="12" font-weight="600">@microsoft/signalr WebSocket</text>
+          <text x="44" y="354" fill="#9ca3af" font-size="11">• Live DriverLocation stream to Rider &amp; Driver</text>
+          <text x="44" y="372" fill="#9ca3af" font-size="11">• Instant OfferReceived &amp; RideStatusChanged</text>
+
+          <!-- ==================== ARROWS: FRONTEND <-> BACKEND ==================== -->
+          <!-- REST Commands -->
+          <line x1="347" y1="104" x2="486" y2="104" stroke="#d7c4a3" stroke-width="2.2" marker-end="url(#arrowGold)" />
+          <rect x="364" y="76" width="108" height="44" rx="6" fill="#0f1012" stroke="#d7c4a3" />
+          <text x="376" y="95" fill="#d7c4a3" font-size="11" font-weight="700">REST API</text>
+          <text x="376" y="111" fill="#9ca3af" font-size="9">Book · Accept · Start</text>
+
+          <!-- SignalR Push -->
+          <line x1="486" y1="325" x2="347" y2="325" stroke="#10b981" stroke-width="2.5" marker-end="url(#arrowGreen)" stroke-dasharray="6 4" />
+          <rect x="358" y="286" width="120" height="64" rx="6" fill="#0f1012" stroke="#10b981" />
+          <text x="368" y="305" fill="#10b981" font-size="11" font-weight="700">SignalR Push</text>
+          <text x="368" y="321" fill="#f3f0e8" font-size="9">• DriverLocation</text>
+          <text x="368" y="334" fill="#f3f0e8" font-size="9">• OfferReceived</text>
+          <text x="368" y="346" fill="#f3f0e8" font-size="9">• RideStatusChanged</text>
+
+          <!-- ==================== COLUMN 2: BACKEND MICROSERVICES (src/GrabBike.Api) ==================== -->
+          <rect x="490" y="10" width="440" height="398" rx="12" fill="#12151b" stroke="#d7c4a3" stroke-width="1.8" />
+          <rect x="506" y="24" width="184" height="22" rx="4" fill="rgba(215,196,163,0.18)" />
+          <text x="516" y="39" fill="#d7c4a3" font-size="11" font-weight="700" letter-spacing="0.8">BACKEND MICROSERVICES</text>
+          <text x="700" y="39" fill="#f3f0e8" font-size="13" font-weight="700">ASP.NET Core (.NET 10)</text>
+
+          <!-- Row 1 Left: Ride Service -->
+          <rect x="506" y="58" width="200" height="98" rx="10" fill="#181c24" stroke="#60a5fa" stroke-width="1.4" />
+          <text x="520" y="82" fill="#60a5fa" font-size="14" font-weight="700">Ride Service</text>
+          <text x="520" y="100" fill="#f3f0e8" font-size="10" font-weight="600">Features/Rides</text>
+          <text x="520" y="120" fill="#9ca3af" font-size="10">• Book · Accept · Start · Complete</text>
+          <text x="520" y="138" fill="#9ca3af" font-size="10">• Trip state machine &amp; history</text>
+
+          <!-- Row 1 Right: Dispatch Service -->
+          <rect x="716" y="58" width="198" height="98" rx="10" fill="#181c24" stroke="#f59e0b" stroke-width="1.4" />
+          <text x="730" y="82" fill="#f59e0b" font-size="14" font-weight="700">Dispatch Service</text>
+          <text x="730" y="100" fill="#f3f0e8" font-size="10" font-weight="600">Features/Dispatch</text>
+          <text x="730" y="120" fill="#9ca3af" font-size="10">• PostGIS nearest driver (3km)</text>
+          <text x="730" y="138" fill="#9ca3af" font-size="10">• 30s offer round via Service Bus</text>
+
+          <!-- Row 2 Left: Map & Quote Service -->
+          <rect x="506" y="168" width="200" height="98" rx="10" fill="#181c24" stroke="#10b981" stroke-width="1.4" />
+          <text x="520" y="192" fill="#10b981" font-size="14" font-weight="700">Map &amp; Quote Service</text>
+          <text x="520" y="210" fill="#f3f0e8" font-size="10" font-weight="600">Features/Maps</text>
+          <text x="520" y="230" fill="#9ca3af" font-size="10">• Place search &amp; route polyline</text>
+          <text x="520" y="248" fill="#9ca3af" font-size="10">• Distance, duration &amp; fare quote</text>
+
+          <!-- Row 2 Right: Driver & Auth Service -->
+          <rect x="716" y="168" width="198" height="98" rx="10" fill="#181c24" stroke="#d7c4a3" stroke-width="1.4" />
+          <text x="730" y="192" fill="#d7c4a3" font-size="14" font-weight="700">Driver &amp; Auth Service</text>
+          <text x="730" y="210" fill="#f3f0e8" font-size="10" font-weight="600">Features/Drivers &amp; Auth</text>
+          <text x="730" y="230" fill="#9ca3af" font-size="10">• Driver online &amp; live GPS coords</text>
+          <text x="730" y="248" fill="#9ca3af" font-size="10">• Entra ID JWT &amp; telemetry</text>
+
+          <!-- Row 3 Bottom: Realtime Hub Service -->
+          <rect x="506" y="278" width="408" height="114" rx="10" fill="#181c24" stroke="#10b981" stroke-width="1.5" />
+          <text x="522" y="304" fill="#10b981" font-size="14" font-weight="700">Realtime Notification Service (SignalR /hubs/ride)</text>
+          <text x="522" y="328" fill="#f3f0e8" font-size="11">• DriverLocation → streams live (lat, lng, heading) to Rider &amp; Driver</text>
+          <text x="522" y="348" fill="#f3f0e8" font-size="11">• RideStatusChanged → syncs trip status to Rider &amp; Driver</text>
+          <text x="522" y="368" fill="#f3f0e8" font-size="11">• OfferReceived / OfferClosed → pushes 30s offer to matched Driver</text>
+
+          <!-- ==================== ARROWS: BACKEND <-> CLOUD INFRA ==================== -->
+          <line x1="914" y1="107" x2="1002" y2="105" stroke="#f59e0b" stroke-width="2.2" marker-end="url(#arrowAmber)" />
+          <line x1="914" y1="217" x2="1002" y2="235" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrowBlue)" />
+          <line x1="914" y1="335" x2="1002" y2="345" stroke="#10b981" stroke-width="2" marker-end="url(#arrowGreen)" />
+
+          <!-- ==================== COLUMN 3: CLOUD INFRASTRUCTURE ==================== -->
+          <rect x="1006" y="10" width="302" height="398" rx="12" fill="#12151b" stroke="#10b981" stroke-width="1.8" />
+          <rect x="1020" y="24" width="128" height="22" rx="4" fill="rgba(16,185,129,0.18)" />
+          <text x="1030" y="39" fill="#10b981" font-size="11" font-weight="700" letter-spacing="0.8">AZURE CLOUD</text>
+          <text x="1158" y="39" fill="#f3f0e8" font-size="13" font-weight="700">Managed Services</text>
+
+          <!-- 1. Azure Service Bus -->
+          <rect x="1020" y="60" width="274" height="114" rx="8" fill="#181c24" stroke="#f59e0b" stroke-width="1.5" />
+          <text x="1034" y="84" fill="#f59e0b" font-size="14" font-weight="700">Azure Service Bus (Queue: dispatch)</text>
+          <text x="1034" y="106" fill="#f3f0e8" font-size="11" font-weight="600">1. DispatchRequested (RideId, Round)</text>
+          <text x="1034" y="122" fill="#9ca3af" font-size="10">   Triggers nearest-driver offer match</text>
+          <text x="1034" y="142" fill="#f3f0e8" font-size="11" font-weight="600">2. OfferRoundTimeout (+30s scheduled)</text>
+          <text x="1034" y="158" fill="#9ca3af" font-size="10">   Expires unanswered offer → next round</text>
+
+          <!-- 2. Postgres + PostGIS -->
+          <rect x="1020" y="188" width="274" height="98" rx="8" fill="#181c24" stroke="#60a5fa" stroke-width="1.4" />
+          <text x="1034" y="212" fill="#60a5fa" font-size="14" font-weight="700">PostgreSQL + PostGIS</text>
+          <text x="1034" y="234" fill="#f3f0e8" font-size="11">Npgsql + NetTopologySuite</text>
+          <text x="1034" y="252" fill="#9ca3af" font-size="10">• Rides, Quotes, Offers &amp; Driver coords</text>
+          <text x="1034" y="268" fill="#9ca3af" font-size="10">• Spatial distance queries</text>
+
+          <!-- 3. Maps & Auth/Observability -->
+          <rect x="1020" y="300" width="274" height="92" rx="8" fill="#181c24" stroke="#10b981" stroke-width="1.4" />
+          <text x="1034" y="324" fill="#10b981" font-size="14" font-weight="700">Maps, Entra ID &amp; App Insights</text>
+          <text x="1034" y="346" fill="#f3f0e8" font-size="11">• VietMap API &amp; Google Maps Routes API</text>
+          <text x="1034" y="364" fill="#9ca3af" font-size="10">• Microsoft Entra ID JWT Bearer Auth</text>
+          <text x="1034" y="380" fill="#9ca3af" font-size="10">• OpenTelemetry → Azure Monitor</text>
+
+          <!-- ==================== BOTTOM BAR: AI AGENT WORKFLOW ==================== -->
+          <rect x="12" y="422" width="1296" height="56" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5" />
+          <text x="30" y="444" fill="#10b981" font-size="11" font-weight="700" letter-spacing="0.8">BUILT, TESTED &amp; DEPLOYED BY CURSOR AI AGENTS (.cursor/agents/ + GitHub Actions)</text>
+          <text x="30" y="465" fill="#f3f0e8" font-size="13" font-weight="600">
+            planner   →   implementer (.NET 10 + Next.js 15)   →   verifier (dotnet test + npm test + Playwright E2E)   →   reviewer   →   Azure OneDeploy
+          </text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="slide-footer">
+      <span>Happy Ride Architecture · ServiceBusDispatchBus.cs + DispatchService.cs + SignalRRideEventPublisher.cs</span>
+      <span>Slide 4 / 4</span>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  const dotsEl = document.getElementById("dots");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const gridBtn = document.getElementById("gridBtn");
+  const params = new URLSearchParams(location.search);
+  let i = Math.max(0, Math.min(slides.length - 1, (parseInt(params.get("slide") || "1", 10) || 1) - 1));
+
+  slides.forEach((s, idx) => {
+    const b = document.createElement("button");
+    b.className = "dot";
+    b.textContent = idx + 1;
+    b.title = "Go to slide " + (idx + 1);
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      i = idx;
+      document.body.classList.remove("grid-mode");
+      show();
+    });
+    dotsEl.appendChild(b);
+
+    s.addEventListener("click", () => {
+      if (document.body.classList.contains("grid-mode")) {
+        i = idx;
+        document.body.classList.remove("grid-mode");
+        show();
+      }
+    });
+  });
+
+  function show(syncUrl = true) {
+    slides.forEach((s, n) => s.classList.toggle("active", n === i));
+    [...dotsEl.children].forEach((d, n) => d.classList.toggle("active", n === i));
+    const isGrid = document.body.classList.contains("grid-mode");
+    gridBtn.textContent = isGrid ? "Single Slide (G)" : "Overview (G)";
+    if (syncUrl && typeof history.replaceState === "function") {
+      const url = new URL(location.href);
+      url.searchParams.set("slide", String(i + 1));
+      url.searchParams.delete("v");
+      history.replaceState({ slide: i + 1 }, "", url.pathname + url.search + url.hash);
+    }
+  }
+
+  addEventListener("popstate", () => {
+    const p = new URLSearchParams(location.search);
+    i = Math.max(0, Math.min(slides.length - 1, (parseInt(p.get("slide") || "1", 10) || 1) - 1));
+    show(false);
+  });
+
+  prevBtn.addEventListener("click", () => {
+    document.body.classList.remove("grid-mode");
+    i = Math.max(0, i - 1);
+    show();
+  });
+
+  nextBtn.addEventListener("click", () => {
+    document.body.classList.remove("grid-mode");
+    i = Math.min(slides.length - 1, i + 1);
+    show();
+  });
+
+  gridBtn.addEventListener("click", () => {
+    document.body.classList.toggle("grid-mode");
+    show();
+  });
+
+  addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "g" || e.key === "G") {
+      document.body.classList.toggle("grid-mode");
+      show();
+      return;
+    }
+    if (e.key === "Escape" && document.body.classList.contains("grid-mode")) {
+      document.body.classList.remove("grid-mode");
+      show();
+      return;
+    }
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
+      e.preventDefault();
+      document.body.classList.remove("grid-mode");
+      i = Math.min(slides.length - 1, i + 1);
+      show();
+    }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") {
+      e.preventDefault();
+      document.body.classList.remove("grid-mode");
+      i = Math.max(0, i - 1);
+      show();
+    }
+  });
+
+  show();
+</script>
+</body>
+</html>
