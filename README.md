@@ -9,15 +9,15 @@ Motorbike ride-hailing MVP for Hanoi and Ho Chi Minh City built with an ASP.NET 
 
 ## Screenshots
 
-### Home — Persona Picker & City Map
+### Home — Persona Picker & Light City Map
 
 ![Happy Ride home screen](docs/screenshots/home.png)
 
-### Driver — Incoming Ride Offer
+### Driver — Incoming Ride Offer on Light Street Map
 
 ![Happy Ride driver offer screen](docs/screenshots/driver-offer.png)
 
-### Rider — Matched Driver & Live Route
+### Rider — Matched Driver & Live Route on Light Street Map
 
 ![Happy Ride rider matched screen](docs/screenshots/rider-matched.png)
 
