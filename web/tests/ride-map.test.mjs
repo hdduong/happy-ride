@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { finishedPlace, mapAtFinishedPlace, remainingLine, riderPosition, routeForStatus } from "../features/maps/geo.ts";
+import { driverMap } from "../features/driver/driverMap.ts";
+import { riderMap } from "../features/rider/riderMap.ts";
 
 test("an accepted ride draws the road to the rider", () => {
   const route = routeForStatus(
@@ -142,12 +144,66 @@ test("an unmatched bike still shows the whole road", () => {
   assert.equal(shown.at(-1).lng, 105.97);
 });
 
-test("a started ride keeps the rider on the bike", () => {
+test("a started ride keeps the rider on the bike until drop-off", () => {
   const pickup = { lat: 21.03, lng: 105.82 };
+  const dropoff = { lat: 21.035, lng: 105.821 };
   const driver = { lat: 21.036, lng: 105.831 };
-  assert.deepEqual(riderPosition("InProgress", pickup, driver), driver);
-  assert.deepEqual(riderPosition("DroppedOff", pickup, driver), driver);
-  assert.deepEqual(riderPosition("Accepted", pickup, driver), pickup);
+  assert.deepEqual(riderPosition("InProgress", pickup, driver, dropoff), driver);
+  assert.deepEqual(riderPosition("DroppedOff", pickup, driver, dropoff), dropoff);
+  assert.deepEqual(riderPosition("Completed", pickup, driver, dropoff), dropoff);
+  assert.deepEqual(riderPosition("Accepted", pickup, driver, dropoff), pickup);
+});
+
+test("after drop-off the rider stays at the destination while only the driver moves", () => {
+  const pickup = { lat: 21.03342, lng: 105.82845, address: "Lẩu Ếch Hà My" };
+  const dropoff = { lat: 21.0315, lng: 105.84, address: "Công viên Lê-nin" };
+  const roaming = {
+    rideId: "ride-roam",
+    driverId: "driver-1",
+    lat: 21.0342,
+    lng: 105.8418,
+    heading: 15,
+    speedKmh: 36,
+    at: "2026-10-23T12:00:05Z",
+  };
+  const ride = {
+    rideId: "ride-roam",
+    status: "DroppedOff",
+    pickup,
+    dropoff,
+    distanceM: 1400,
+    durationS: 240,
+    fareVnd: 16000,
+    route: { type: "LineString", coordinates: [[pickup.lng, pickup.lat], [dropoff.lng, dropoff.lat]] },
+    round: 1,
+    driver: { userId: "driver-1", name: "HanoiD02", plate: "29-P1 200.02", lat: dropoff.lat, lng: dropoff.lng },
+  };
+  for (const status of ["DroppedOff", "Completed"]) {
+    const view = riderMap({
+      ride: { ...ride, status },
+      live: roaming,
+      pickup: { id: "home", name: pickup.address, address: pickup.address, lat: pickup.lat, lng: pickup.lng },
+      destination: null,
+      quote: null,
+    });
+    assert.deepEqual(view.route, []);
+    assert.deepEqual(view.markers, [
+      { ...dropoff, kind: "pickup" },
+      { lat: roaming.lat, lng: roaming.lng, kind: "bike", heading: 15 },
+    ]);
+  }
+  const driverView = driverMap({
+    ride,
+    live: roaming,
+    offer: null,
+    center: pickup,
+    me: { id: "driver-1", name: "HanoiD02", role: "Driver", city: "Hanoi", plate: "29-P1 200.02", lat: dropoff.lat, lng: dropoff.lng },
+  });
+  assert.deepEqual(driverView.route, []);
+  assert.deepEqual(driverView.markers, [
+    { ...dropoff, kind: "pickup", offset: undefined },
+    { lat: roaming.lat, lng: roaming.lng, kind: "bike", heading: 15 },
+  ]);
 });
 
 test("a finished ride leaves the rider at the drop-off", () => {

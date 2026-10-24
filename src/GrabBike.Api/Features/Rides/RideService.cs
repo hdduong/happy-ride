@@ -199,7 +199,10 @@ public sealed class RideService(
         {
             var dropped = await drivers.FindAsync(droppedDriverId, cancellationToken);
             if (dropped is not null)
-                roam.Begin(dropped.UserId, dropped.Lat, dropped.Lng);
+            {
+                SnapToRouteEnd(ride, dropped);
+                roam.Begin(dropped.UserId, dropped.Lat, dropped.Lng, ride.Id, ride.RiderId);
+            }
         }
 
         var result = await StatusResultAsync(ride, cancellationToken);
@@ -227,6 +230,25 @@ public sealed class RideService(
         var start = ride.Route.Coordinates[0];
         driver.Lng = start[0];
         driver.Lat = start[1];
+        driver.SpeedKmh = 0;
+    }
+
+    private static void SnapToRouteEnd(Ride ride, Driver driver)
+    {
+        if (ride.Route.Coordinates.Length > 0)
+        {
+            var end = ride.Route.Coordinates[^1];
+            driver.Lng = end[0];
+            driver.Lat = end[1];
+            ride.SegmentIndex = Math.Max(ride.Route.Coordinates.Length - 1, 0);
+            ride.SegmentOffsetM = 0;
+        }
+        else
+        {
+            driver.Lat = ride.Dropoff.Lat;
+            driver.Lng = ride.Dropoff.Lng;
+        }
+
         driver.SpeedKmh = 0;
     }
 

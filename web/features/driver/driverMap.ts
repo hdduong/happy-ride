@@ -1,5 +1,5 @@
-import { bearing, isPlotted, riderPosition, routeForStatus } from "@/features/maps/geo";
-import type { MapMarker } from "@/features/maps/MapCanvas";
+import { bearing, isPlotted, riderPosition, routeForStatus } from "../maps/geo";
+import type { MapMarker } from "../maps/MapCanvas";
 import type { DriverDashboard } from "./useDriverDashboard";
 
 export function driverMap({ ride, live, offer, center, me }: Pick<DriverDashboard, "ride" | "live" | "offer" | "center" | "me">) {
@@ -24,19 +24,28 @@ export function driverMap({ ride, live, offer, center, me }: Pick<DriverDashboar
   const markers: MapMarker[] = [];
   const pickupPoint = ride?.pickup ?? offer?.pickup ?? null;
   const dropoffPoint = ride?.dropoff ?? offer?.dropoff ?? null;
-  const together = ride?.status === "InProgress" || ride?.status === "DroppedOff";
-  const riderPoint = pickupPoint ? riderPosition(ride?.status, pickupPoint, driverPoint) : null;
+  const dropped = Boolean(ride && (ride.status === "DroppedOff" || ride.status === "Completed"));
+  const together = ride?.status === "InProgress";
+  const riderPoint = pickupPoint ? riderPosition(ride?.status, pickupPoint, driverPoint, dropoffPoint) : null;
   if (riderPoint && isPlotted(riderPoint) && (ride || offer)) {
     markers.push({ ...riderPoint, kind: "pickup", offset: together ? [-16, 8] : undefined });
   }
-  if (dropoffPoint && isPlotted(dropoffPoint) && (ride || offer)) markers.push({ ...dropoffPoint, kind: "dropoff" });
+  if (!dropped && dropoffPoint && isPlotted(dropoffPoint) && (ride || offer)) {
+    markers.push({ ...dropoffPoint, kind: "dropoff" });
+  }
   if (driverPoint && ride && isPlotted(driverPoint)) {
     const target = ride.status === "Accepted" || ride.status === "DriverArrived" ? ride.pickup : ride.dropoff;
     const heading = driverLive?.heading != null ? driverLive.heading : bearing(driverPoint, target);
     markers.push({ ...driverPoint, kind: "bike", heading });
   }
-  const self = me?.lat != null && me.lng != null ? { lat: me.lat, lng: me.lng } : null;
-  if (!driverPoint && self && isPlotted(self)) markers.push({ ...self, kind: "bike" });
+  const selfLive = !ride && live && (!me || !live.driverId || live.driverId === me.id) ? live : null;
+  const self = selfLive
+    ? { lat: selfLive.lat, lng: selfLive.lng, heading: selfLive.heading ?? undefined }
+    : me?.lat != null && me.lng != null
+      ? { lat: me.lat, lng: me.lng, heading: undefined }
+      : null;
+  if (!driverPoint && self && isPlotted(self)) markers.push({ ...self, kind: "bike", heading: self.heading });
+  const focus = dropped && dropoffPoint && isPlotted(dropoffPoint) ? dropoffPoint : pickupPoint;
 
-  return { center: pickupPoint && isPlotted(pickupPoint) ? pickupPoint : self && isPlotted(self) ? self : center, route, markers };
+  return { center: focus && isPlotted(focus) ? focus : self && isPlotted(self) ? self : center, route, markers };
 }

@@ -60,6 +60,7 @@ export function routeForStatus(
   progress?: LatLng | null,
   rideId?: string | null,
 ): LatLng[] {
+  if (status === "DroppedOff" || status === "Completed") return [];
   let line: LatLng[];
   if (status === "Accepted") {
     const approachLine = linePoints(approach);
@@ -178,8 +179,14 @@ function closestOnSegment(start: LatLng, end: LatLng, point: LatLng): { point: L
   return { point: snapped, distanceM: haversineMeters(snapped, point), alongSegmentM: t * lengthM };
 }
 
-export function riderPosition(status: string | undefined, pickup: LatLng, driver: LatLng | null): LatLng {
-  if ((status === "InProgress" || status === "DroppedOff") && isPlotted(driver)) return driver;
+export function riderPosition(
+  status: string | undefined,
+  pickup: LatLng,
+  driver: LatLng | null,
+  dropoff?: LatLng | null,
+): LatLng {
+  if ((status === "DroppedOff" || status === "Completed") && isPlotted(dropoff)) return dropoff;
+  if (status === "InProgress" && isPlotted(driver)) return driver;
   return pickup;
 }
 
