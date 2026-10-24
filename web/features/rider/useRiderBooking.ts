@@ -194,7 +194,7 @@ export function useRiderBooking(userId: string) {
     setError(null);
     try {
       stayAtDropoff.current = true;
-      const place = finishedPlace(current);
+      const place = finishedPlace({ ...current, status: "Completed" });
       if (place) setHome(place);
       await session.command(async () => {
         const updated = await confirmArrival(userId, current.rideId);

@@ -1,16 +1,20 @@
-import { bearing, isPlotted, mapAtFinishedPlace, riderPosition, routeForStatus } from "@/features/maps/geo";
-import type { MapMarker } from "@/features/maps/MapCanvas";
+import { bearing, isPlotted, mapAtFinishedPlace, riderPosition, routeForStatus } from "../maps/geo";
+import type { MapMarker } from "../maps/MapCanvas";
 import type { RiderBooking } from "./useRiderBooking";
 
 export function riderMap({ ride, live, pickup: selected, destination, quote }: Pick<RiderBooking, "ride" | "live" | "pickup" | "destination" | "quote">) {
   if (ride?.status === "Completed" && isPlotted(ride.dropoff)) {
     return { ...mapAtFinishedPlace(ride.dropoff), driverLive: null };
   }
-  const pickup = ride?.pickup ?? {
-    lat: selected.lat,
-    lng: selected.lng,
-    address: selected.name,
-  };
+  const dropped = Boolean(ride?.status === "DroppedOff" && isPlotted(ride.dropoff));
+  const pickup =
+    dropped && ride
+      ? { lat: ride.dropoff.lat, lng: ride.dropoff.lng, address: ride.dropoff.address }
+      : ride?.pickup ?? {
+          lat: selected.lat,
+          lng: selected.lng,
+          address: selected.name,
+        };
   const dropoff =
     ride?.dropoff ??
     (destination
@@ -43,11 +47,11 @@ export function riderMap({ ride, live, pickup: selected, destination, quote }: P
       ride.status !== "NoDriver" &&
       ride.status !== "Cancelled",
   );
-  const together = ride?.status === "InProgress" || ride?.status === "DroppedOff";
-  const riderPoint = riderPosition(ride?.status, pickup, driverPoint);
+  const together = ride?.status === "InProgress";
+  const riderPoint = riderPosition(ride?.status, pickup, driverPoint, dropoff);
   const markers: MapMarker[] = [];
   if (isPlotted(riderPoint)) markers.push({ ...riderPoint, kind: "pickup", offset: together ? [-16, 8] : undefined });
-  if (dropoff && isPlotted(dropoff) && (ride || quote)) markers.push({ ...dropoff, kind: "dropoff" });
+  if (!dropped && dropoff && isPlotted(dropoff) && (ride || quote)) markers.push({ ...dropoff, kind: "dropoff" });
   if (showBike && driverPoint && isPlotted(driverPoint)) {
     markers.push({ ...driverPoint, kind: "bike", heading });
   }

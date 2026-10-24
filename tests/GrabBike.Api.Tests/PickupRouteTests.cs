@@ -44,4 +44,37 @@ public class PickupRouteTests
         Assert.Equal(105.82, route.Coordinates[1][0]);
         Assert.Equal(21.03, route.Coordinates[1][1]);
     }
+
+    [Fact]
+    public void Roam_advances_along_the_street_route_instead_of_cutting_across_blocks()
+    {
+        var roam = new DriverRoam();
+        var driverId = Guid.NewGuid();
+        roam.Begin(driverId, 21.0300, 105.8400);
+
+        var pending = Assert.Single(roam.PendingRoutes());
+        Assert.Equal(driverId, pending.DriverId);
+        Assert.False(roam.TryAdvance(driverId, 20, out _));
+
+        var streetRoute = new GeoRoute("LineString",
+        [
+            [105.8400, 21.0300],
+            [105.8400, 21.0310],
+            [105.8420, 21.0310],
+        ]);
+        roam.SetRoute(driverId, pending.Ticket, streetRoute);
+        Assert.Empty(roam.PendingRoutes());
+
+        Assert.True(roam.TryAdvance(driverId, 20, out var first));
+        Assert.Equal(105.8400, first.Lng, 5);
+        Assert.InRange(first.Lat, 21.0301, 21.0303);
+        Assert.False(first.Finished);
+
+        for (var i = 0; i < 20 && !first.Finished; i++)
+            Assert.True(roam.TryAdvance(driverId, 20, out first));
+
+        Assert.True(first.Finished);
+        Assert.Equal(21.0310, first.Lat, 4);
+        Assert.Equal(105.8420, first.Lng, 4);
+    }
 }

@@ -21,6 +21,7 @@ public sealed class DriverSimulationService(
     public async Task<List<OutboundEvent>> AdvanceAsync(DateTimeOffset now, double stepMeters, CancellationToken cancellationToken = default)
     {
         await EnsurePickupRoutesAsync(cancellationToken);
+        await EnsureRoamRoutesAsync(cancellationToken);
         await using var _ = await writeLock.AcquireAsync(cancellationToken);
         var events = new List<OutboundEvent>();
         foreach (var driver in await drivers.ListOnTripAsync(cancellationToken))
@@ -79,12 +80,22 @@ public sealed class DriverSimulationService(
         }
     }
 
+    private async Task EnsureRoamRoutesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var pending in roam.PendingRoutes())
+        {
+            var target = new GeoPoint { Lat = pending.TargetLat, Lng = pending.TargetLng, Address = "Nearby" };
+            var route = await pickupRouter.ToPickupAsync(pending.StartLat, pending.StartLng, target, cancellationToken);
+            roam.SetRoute(pending.DriverId, pending.Ticket, route);
+        }
+    }
+
     private async Task RoamAsync(List<OutboundEvent> events, DateTimeOffset now, double stepMeters, CancellationToken cancellationToken)
     {
         foreach (var driverId in roam.Drivers())
         {
             var driver = await drivers.FindAsync(driverId, cancellationToken);
-            if (driver is null || !roam.TryTarget(driverId, out var targetLat, out var targetLng))
+            if (driver is null || !roam.TryTarget(driverId, out _, out _))
             {
                 roam.Clear(driverId);
                 continue;
@@ -94,15 +105,20 @@ public sealed class DriverSimulationService(
             if (driver.Status == DriverStatus.OnTrip && driver.CurrentRideId is Guid rideId)
             {
                 ride = await rides.FindAsync(rideId, cancellationToken);
-                if (ride is not null && ride.Status is RideStatus.Accepted or RideStatus.InProgress)
+                if (ride is not null && ride.Status is RideStatus.Accepted or RideStatus.DriverArrived or RideStatus.InProgress)
+                {
+                    roam.Clear(driverId);
                     continue;
+                }
             }
 
-            var moved = Geo.MoveToward(driver.Lat, driver.Lng, targetLat, targetLng, stepMeters);
+            if (!roam.TryAdvance(driverId, stepMeters, out var moved))
+                continue;
+
             ApplyMovement(driver, moved.Lat, moved.Lng, moved.Heading, moved.MovedM);
             if (ride is not null && ride.Status == RideStatus.DroppedOff && moved.MovedM >= 0.5)
                 events.Add(LocationEvent(ride, driver, now));
-            if (Geo.HaversineMeters(driver.Lat, driver.Lng, targetLat, targetLng) < 15)
+            if (moved.Finished)
             {
                 driver.SpeedKmh = 0;
                 roam.Clear(driverId);
